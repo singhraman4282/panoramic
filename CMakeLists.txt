@@ -7,6 +7,10 @@ project(panoramic)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy  
+  std_msgs
+  sensor_msgs
+  message_generation
+  cv_bridge
 )
 find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
@@ -52,11 +56,10 @@ find_package(OpenCV REQUIRED)
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+  FILES
+  SphericalStitch.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -66,10 +69,11 @@ find_package(OpenCV REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs  # Or other packages containing msgs
+  sensor_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -83,7 +87,7 @@ find_package(OpenCV REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES panoramic
- CATKIN_DEPENDS roscpp rospy
+ CATKIN_DEPENDS roscpp rospy message_runtime
 #  DEPENDS system_lib
 )
 
@@ -102,6 +106,7 @@ include_directories(
 ## Declare a cpp library
 add_library(panoramiclib
   src/${PROJECT_NAME}/Panoramic.cpp
+  src/${PROJECT_NAME}/CameraVideoPublisher.cpp
 )
 target_link_libraries(panoramiclib
     ${catkin_LIBRARIES}
@@ -116,8 +121,15 @@ target_link_libraries(panoramic
     panoramiclib
 )
 
-add_executable(panoramic src/test_panoramic.cpp)
+add_executable(test_panoramic src/test_panoramic.cpp)
 target_link_libraries(test_panoramic
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    panoramiclib
+)
+
+add_executable(camera_video_publisher src/camera_video_publisher)
+target_link_libraries(camera_video_publisher
     ${catkin_LIBRARIES}
     ${OpenCV_LIBRARIES}
     panoramiclib

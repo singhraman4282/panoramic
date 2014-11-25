@@ -1,0 +1,5 @@
+<launch>
+<node name="camera_video_publisher" pkg="panoramic" type="camera_video_publisher">
+  <param name="calib_dir" value="/home/tgdiriba/Code/ros_ws/src/panoramic/config/" type="str" />
+</node>
+</launch>
