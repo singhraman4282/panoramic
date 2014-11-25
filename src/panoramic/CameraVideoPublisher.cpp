@@ -36,10 +36,11 @@ CameraVideoPublisher::CameraVideoPublisher(std::string param_dir_) :
   // Define the service used to set the camera calibration parameters
   for(int i = 0; i < camera_video_capture_.size(); i++) {
     std::stringstream ss;
-    ss << "camera_calib_" << i;
+    ss << "camera_" << i << "/set_camera_info";
     std::string camera_service_name = ss.str();
 
     ros::ServiceServer t_camera_service = nh_.advertiseService<SetCameraInfoRequest, SetCameraInfoResponse>(camera_service_name.c_str(), boost::bind(&CameraVideoPublisher::setCameraInfo, this, _1, _2));
+    camera_calib_service_.push_back( t_camera_service );
   }
 }
 
