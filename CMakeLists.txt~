@@ -108,7 +108,6 @@ add_library(panoramiclib
   src/${PROJECT_NAME}/Panoramic.cpp
   src/${PROJECT_NAME}/CameraVideoPublisher.cpp
 )
-add_dependencies(panoramiclib panoramiclib_gencpp)
 target_link_libraries(panoramiclib
     ${catkin_LIBRARIES}
     ${OpenCV_LIBRARIES}
