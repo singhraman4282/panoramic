@@ -17,7 +17,7 @@ CameraVideoPublisher::CameraVideoPublisher(std::string param_dir_) :
   // Find the number of cameras available
   bool camera_limit_reached = false;
   do {
-    cv::VideoCapture t_cap(camera_video_capture_.size());
+    cv::VideoCapture t_cap(camera_video_capture_.size()-1);
 
     // Checking if video capture is working by loading an image
     // Using isOpened doesn't have enough of a delay
