@@ -136,6 +136,12 @@ target_link_libraries(camera_video_publisher
     panoramiclib
 )
 
+add_executable(spherical_warping src/tests/spherical_warping.cpp)
+target_link_libraries(spherical_warping
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    panoramiclib
+)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes

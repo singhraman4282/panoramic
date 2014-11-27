@@ -1,4 +1,5 @@
 #include <panoramic/Panoramic.hpp>
+#include <iostream>
 
 using namespace nurc;
 
@@ -43,8 +44,9 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
   for(int y = 0; y < input.rows; y++) {
     for(int x = 0; x < input.cols; x++) {
       int phi = ( atan( double(y) / pow( pow( double(x), 2 ) + pow( double(focal_length), 2 ) , 0.5 ) )
-                + M_PI/2. ) / double( phi_res );
-      int theta = atan( double(x) / double(focal_length) ) / double( theta_res );
+                + M_PI/2. ) * double( phi_res ) / ( 2. * M_PI );
+      int theta = atan( double(x) / double(focal_length) ) * double( theta_res ) / ( 2. * M_PI );
+      // std::cout << phi << " " << theta << std::endl;
       warp.at<cv::Vec3b>(phi, theta) = input.at<cv::Vec3b>(y, x);
     }
   } 
