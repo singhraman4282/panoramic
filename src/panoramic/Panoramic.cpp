@@ -60,6 +60,14 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<cv::Mat>&
   // Select the first image to be the center
   // Incrementally add elements to the spherial warping
   //   Each time an element is added run an image alignment over it
-  
+
+  cv::SiftFeatureDetector sift_detector;
+  cv::SiftDescriptorExtractor sift_extractor;
+  std::vector<KeyPoints> sift_features( warped_inputs.size() );
+  std::vector<cv::Mat> descriptors( warped_inputs.size() );
+  for(int i = 0; i < warped_inputs.size(); i++) sift_detector.detect( warped_inputs[i], sift_features[i] );
+  for(int i = 0; i < warped_inputs.size(); i++) sift_extractor.compute( warped_inputs[i], sift_features[i], descriptors[i] );
+
+  // Perform a pairwise matching between images or incremental build-up
   
 }

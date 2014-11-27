@@ -11,9 +11,16 @@ int main(int argc, char** argv)
 
   cv::Mat sample = cv::imread("/home/tgdiriba/Code/ros_ws/src/panoramic/res/images/fuji.jpg");
 
-  cv::SIFT sf(1000);
+  cv::SiftFeatureDetector sfd;
+
+  cv::Mat descriptor;
+
   std::vector<cv::KeyPoint> kp;
-  sf(sample, cv::noArray(), kp, cv::noArray());
+  sfd.detect(sample, kp);
+  
+  cv::SiftDescriptorExtractor sde;
+  sde.compute( sample, kp, descriptor );
+  
   cv::drawKeypoints(sample, kp, sample);
 
   cv::imshow("sift_features", sample);

@@ -5,6 +5,7 @@
 #include <sensor_msgs/Image.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/nonfree/features2d.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 #include <panoramic/SphericalStitch.h>
@@ -17,6 +18,7 @@ public:
 
   typedef panoramic::SphericalStitch::Request SphericalStitchRequest;
   typedef panoramic::SphericalStitch::Response SphericalStitchResponse;
+  typedef std::vector<cv::KeyPoint> KeyPoints;
 
   Panoramic();
   ~Panoramic();

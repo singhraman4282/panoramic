@@ -112,6 +112,7 @@ add_dependencies(panoramiclib panoramiclib_gencpp)
 target_link_libraries(panoramiclib
     ${catkin_LIBRARIES}
     ${OpenCV_LIBRARIES}
+    opencv_nonfree
 )
 
 ## Declare a cpp executable
