@@ -43,9 +43,9 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
 
   for(int y = 0; y < input.rows; y++) {
     for(int x = 0; x < input.cols; x++) {
-      int phi = ( atan( double(y) / pow( pow( double(x), 2 ) + pow( double(focal_length), 2 ) , 0.5 ) )
-                + M_PI/2. ) * double( phi_res ) / ( 2. * M_PI );
-      int theta = atan( double(x) / double(focal_length) ) * double( theta_res ) / ( 2. * M_PI );
+      int phi = ( atan( double(y-input.rows/2) / pow( pow( double(x-input.cols/2), 2 ) + pow( double(focal_length), 2 ) , 0.5 ) )
+                + M_PI/2. ) * double( phi_res ) / M_PI;
+      int theta = atan( double(x-input.cols/2) / double(focal_length) ) * double( theta_res ) / M_PI;
       // std::cout << phi << " " << theta << std::endl;
       warp.at<cv::Vec3b>(phi, theta) = input.at<cv::Vec3b>(y, x);
     }
