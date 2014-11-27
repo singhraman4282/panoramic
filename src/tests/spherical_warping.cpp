@@ -15,7 +15,7 @@ int main(int argc, char** argv)
   cv::Mat sample = cv::imread("/home/tgdiriba/Code/ros_ws/src/panoramic/res/images/fuji.jpg");
 
   nurc::Panoramic p_server;
-  cv::Mat warped = p_server.map_to_sphere(sample, 1000, 1000, 100);
+  cv::Mat warped = p_server.map_to_sphere(sample, 1000, 1000, 500);
 
   cv::imshow("Fuji", sample);
   cv::imshow("Fuji Warped", warped);

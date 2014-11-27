@@ -143,6 +143,15 @@ target_link_libraries(spherical_warping
     panoramiclib
 )
 
+add_executable(sift_features src/tests/sift_features.cpp)
+target_link_libraries(sift_features
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    panoramiclib
+    opencv_nonfree
+    opencv_features2d
+)
+
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(panoramic_node panoramic_generate_messages_cpp)
