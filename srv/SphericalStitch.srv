@@ -1,3 +1,9 @@
+int32 FOCAL_LENGTH=0
+int32 MAX_RES=0
+
+uint32 s
+uint32 theta_res
+uint32 phi_res
 sensor_msgs/Image[] queue
 ---
 sensor_msgs/Image stitch
