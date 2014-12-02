@@ -171,6 +171,14 @@ target_link_libraries(FLANN_test
     opencv_features2d
 )
 
+add_executable(match_sphere src/tests/match_sphere.cpp)
+target_link_libraries(match_sphere
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    panoramiclib
+    opencv_nonfree
+    opencv_features2d
+)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(panoramic_node panoramic_generate_messages_cpp)
