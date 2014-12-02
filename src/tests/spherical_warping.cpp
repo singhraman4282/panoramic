@@ -8,11 +8,8 @@
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "spherical_warping");
-  ros::NodeHandle nh;
-  
   std::string input_path, output_path;
-  std::cout << "Please input the path to the first image: ";
+  std::cout << "Please input the path to the image: ";
   std::cin >> input_path;
   std::cout << "Please input the path to where to save the warped image: ";
   std::cin >> output_path;
