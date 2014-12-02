@@ -39,17 +39,14 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
 {
   // Half-warp warping
   // Total resolution has to be an even number
-  cv::Mat warp( phi_res, theta_res, CV_8UC3 );
+  cv::Mat warp;
 
-  for(int y = 0; y < input.rows; y++) {
-    for(int x = 0; x < input.cols; x++) {
-      int phi = ( atan( double(y-input.rows/2) / pow( pow( double(x-input.cols/2), 2 ) + pow( double(focal_length), 2 ) , 0.5 ) )
-                + M_PI/2. ) * double( phi_res ) / M_PI;
-      int theta = atan( double(x-input.cols/2) / double(focal_length) ) * double( theta_res ) / M_PI;
-      // std::cout << phi << " " << theta << std::endl;
-      warp.at<cv::Vec3b>(phi, theta) = input.at<cv::Vec3b>(y, x);
-    }
-  } 
+  // Testing OpenCV Spherical Warping
+  cv::detail::SphericalWarper sw(focal_length);
+  float K_data[9] = { 597.0470, 0, 325.596134, 0, 596.950842, 211.872049, 0, 0, 1 };
+  cv::Mat K(3,3, CV_32FC1, K_data);
+  cv::Mat R = cv::Mat::eye(3,3, CV_32FC1);
+  sw.warp(input, K, R, CV_INTER_LINEAR, cv::BORDER_CONSTANT, warp);
 
   return warp;
 }

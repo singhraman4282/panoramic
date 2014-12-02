@@ -6,6 +6,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/nonfree/features2d.hpp>
+#include <opencv2/stitching/warpers.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 #include <panoramic/SphericalStitch.h>
@@ -31,6 +32,7 @@ public:
   void generate_spherical_stitch(cv::Mat& sphere, std::vector<cv::Mat>& warped_inputs, int phi_res, int theta_res);
 
 private:
+  // Camera Calibration
 };
 
 } // namespace nurc
