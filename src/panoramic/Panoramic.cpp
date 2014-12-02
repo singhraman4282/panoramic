@@ -83,6 +83,64 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pai
   // Select the first image to be the center
   // Incrementally add elements to the spherial warping
   //   Each time an element is added run an image alignment over it
+  
+  for(int i = 0; i < warped_input.size()-1; i++){
+    Mat& first_image = warped_inputs[i].first;
+    Mat& second_image = warped_inputs[i+1].first;
+    Mat& first_mask = warped_inputs[i].second;
+    Mat& second_mask = warped_inputs[i+1].second;
+    //-- Step 1: Detect the keypoints using SURF Detector
+    int minHessian = 400;
+    SurfFeatureDetector detector( minHessian );
+    std::vector<KeyPoint> keypoints_1, keypoints_2;
+    detector.detect( first_image, keypoints_1, first_map);
+    detector.detect( second_img, keypoints_2, second_map);
+
+    //-- Step 2: Calculate descriptors (feature vectors)
+    SurfDescriptorExtractor extractor;
+    Mat descriptors_1, descriptors_2;
+    extractor.compute( first_image, keypoints_1, descriptors_1 );
+    extractor.compute( second_image, keypoints_2, descriptors_2 );
+
+    //-- Step 3: Matching descriptor vectors using FLANN matcher
+    FlannBasedMatcher matcher;
+    std::vector< DMatch > matches;
+    matcher.match( descriptors_1, descriptors_2, matches );
+
+    //-- Quick calculation of max and min distances between keypoints
+    double max_dist = 0; double min_dist = 100;
+    for( int i = 0; i < descriptors_1.rows; i++ )
+    { double dist = matches[i].distance;
+      if( dist < min_dist ) min_dist = dist;
+      if( dist > max_dist ) max_dist = dist;
+    }
+//    printf("-- Max dist : %f \n", max_dist );
+//    printf("-- Min dist : %f \n", min_dist );
+
+    //-- Draw only "good" matches
+    std::vector< DMatch > good_matches;
+    for( int i = 0; i < descriptors_1.rows; i++ ){ 
+      if( matches[i].distance <= max(2*min_dist, 0.02) ){ 
+        good_matches.push_back( matches[i]); 
+      }
+    }
+    Mat img_matches;
+    drawMatches( first_image, keypoints_1, second_image, keypoints_2, good_matches, img_matches, Scalar::all(-1), Scalar::all(-1), vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+
+    //-- Show detected matches
+    imshow( "Good Matches", img_matches );
+    for( int i = 0; i < (int)good_matches.size(); i++ ) {
+      printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx );
+    }
+
+    for( int i = 0; i < (int)good_matches.size(); i++ ) { 
+      printf( "-- Good Match Points [%d] 1 X-value: %d  1 Y-value: %d -- 2 X-value: %d 2 Y-value: %d \n", i, 
+      (int)keypoints_1[(int)good_matches[i].queryIdx].pt.x, 
+      (int)keypoints_1[(int)good_matches[i].queryIdx].pt.y, 
+      (int)keypoints_2[(int)good_matches[i].trainIdx].pt.x, 
+      (int)keypoints_2[(int)good_matches[i].trainIdx].pt.y 
+      ); 
+    }
 
   cv::SiftFeatureDetector sift_detector;
   cv::SiftDescriptorExtractor sift_extractor;
