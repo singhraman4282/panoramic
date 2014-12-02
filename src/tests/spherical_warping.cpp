@@ -12,7 +12,7 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
 
   std::cout << "Reading images.\n";
-  cv::Mat sample = cv::imread("/home/tgdiriba/Code/ros_ws/src/panoramic/res/images/fuji.jpg");
+  cv::Mat sample = cv::imread("/home/parallels/Code/ros_ws/src/panoramic/res/images/fuji.jpg");
 
   nurc::Panoramic p_server;
   cv::Mat warped = p_server.map_to_sphere(sample, 1000, 1000, 500);
