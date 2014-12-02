@@ -84,7 +84,7 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pai
   // Incrementally add elements to the spherial warping
   //   Each time an element is added run an image alignment over it
   
-  for(int i = 0; i < warped_input.size()-1; i++){
+  for(int i = 0; i < warped_inputs.size()-1; i++){
     Mat& first_image = warped_inputs[i].first;
     Mat& second_image = warped_inputs[i+1].first;
     Mat& first_mask = warped_inputs[i].second;
@@ -129,7 +129,7 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pai
 
     //-- Show detected matches
     imshow( "Good Matches", img_matches );
-    for( int i = 0; i < (int)good_matches.size(); i++ ) {
+ /*   for( int i = 0; i < (int)good_matches.size(); i++ ) {
       printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx );
     }
 
@@ -140,7 +140,36 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pai
       (int)keypoints_2[(int)good_matches[i].trainIdx].pt.x, 
       (int)keypoints_2[(int)good_matches[i].trainIdx].pt.y 
       ); 
+    } */
+
+    //RANSAC
+    max_iterations = (int)good_matches.size();
+    intlier_threshold = 5;
+    x_transform = 0;
+    y_transform = 0;
+    intlier_count = 0;
+    best_good_match = 0;
+    for (int i = 0; i < max_iterations; i++) {
+      temp_x_transform = (int)keypoints_1[(int)good_matches[i].queryIdx].pt.x - (int)keypoints_2[(int)good_matches[i].trainIdx].pt.x
+      temp_y_transform = (int)keypoints_1[(int)good_matches[i].queryIdx].pt.y - (int)keypoints_2[(int)good_matches[i].trainIdx].pt.y
+      temp_count = 0;
+      for (int j = 0; j < max_iterations; j++) {
+	if (j == i)
+	  continue
+	x_transform_diff = (int)keypoints_1[(int)good_matches[i].queryIdx].pt.x - temp_x_transform - (int)keypoints_2[(int)good_matches[i].trainIdx].pt.x;
+	y_transform_diff = (int)keypoints_1[(int)good_matches[i].queryIdx].pt.y - temp_y_transform - (int)keypoints_2[(int)good_matches[i].trainIdx].pt.y;
+	if (x_transform_diff < 5 && y_transform_diff < 5)
+	  temp_count = temp_count + 1;
+      }
+      if (temp_count > inlier_count){
+	intlier_count = temp_count;
+	x_transform = temp_x_transform;
+	y_transform = temp_y_transform;
+	best_good_match = i;
+      }
     }
+
+
 
   cv::SiftFeatureDetector sift_detector;
   cv::SiftDescriptorExtractor sift_extractor;
