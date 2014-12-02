@@ -63,8 +63,7 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
   std::cout << R << std::endl;
   std::cout << ceil(R) << std::endl;
   cv::imshow("scaled_input", scaled_input);
-  cv::waitKey(10000);
-  
+  cv::waitKey(0);
   cv::Mat warp( phi_res, theta_res, CV_8UC3 );
   for(int y = 0; y < input.rows; y++) {
     for(int x = 0; x < input.cols; x++) {

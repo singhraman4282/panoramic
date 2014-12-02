@@ -7,10 +7,13 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/nonfree/features2d.hpp>
 #include <opencv2/stitching/warpers.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 #include <panoramic/SphericalStitch.h>
 #include <vector>
+#include <cmath>
+#include <algorithm>
 
 namespace nurc {
   
