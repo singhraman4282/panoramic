@@ -107,9 +107,16 @@ int main(int argc, char** argv)
   for( int i = 0; i < (int)good_matches.size(); i++ )
   { printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx ); }
 
-  for( int i = 0; i < (int)good_matches.size(); i++ )
-  { printf( "-- Good Match Points [%d] 1 X-value: %d  1 Y-value: %d -- 2 X-value: %d 2 Y-value: %d \n", i, keypoints_1[good_matches[i].queryIdx].pt.x, keypoints_1[good_matches[i].queryIdx].pt.y, keypoints_2[good_matches[i].trainIdx].pt.x, keypoints_2[good_matches[i].trainIdx].pt.y ); }
-
+  for( int i = 0; i < (int)good_matches.size(); i++ ) { 
+    printf( "-- Good Match Points [%d] 1 X-value: %d  1 Y-value: %d -- 2 X-value: %d 2 Y-value: %d \n", 
+      i, 
+      (int)keypoints_1[(int)good_matches[i].queryIdx].pt.x, 
+      (int)keypoints_1[(int)good_matches[i].queryIdx].pt.y, 
+      (int)keypoints_2[(int)good_matches[i].trainIdx].pt.x, 
+      (int)keypoints_2[(int)good_matches[i].trainIdx].pt.y 
+    ); 
+  }
+  
   cv::imwrite(output_path.c_str(), img_matches);
   
   cv::waitKey(0);
