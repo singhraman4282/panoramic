@@ -24,10 +24,11 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     theta_res = (int)round(double( 2. * M_PI ) / atan( 1. / focal_length ) );
 
   cv::Mat sphere( phi_res, theta_res, CV_8UC3 );
-  std::vector<cv::Mat> image_queue;
+  std::vector< std::pair<cv::Mat, cv::Mat> > image_queue;
   for( int i = 0; i < req.queue.size(); i++ ) {
     cv_bridge::CvImagePtr input_image = cv_bridge::toCvCopy( req.queue[i], sensor_msgs::image_encodings::BGR8 );
-    image_queue.push_back( map_to_sphere( input_image->image, phi_res, theta_res, focal_length ) );
+    cv::Mat mask;
+    image_queue.push_back( std::pair<cv::Mat, cv::Mat>(map_to_sphere( input_image->image, phi_res, theta_res, focal_length, mask ), mask) );
   }
 
   generate_spherical_stitch(sphere, image_queue, phi_res, theta_res);
@@ -35,17 +36,9 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   return true;
 }
 
-cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int focal_length)
+cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask)
 {
-  // Half-warp warping
-  // Total resolution has to be an even number
-
-  // Testing OpenCV Spherical Warping
-  /*cv::detail::SphericalWarper sw(focal_length);
-  float K_data[9] = { 597.0470, 0, 325.596134, 0, 596.950842, 211.872049, 0, 0, 1 };
-  cv::Mat K(3,3, CV_32FC1);
-  cv::Mat R = cv::Mat::eye(3,3, CV_32FC1);
-  sw.warp(input, K, R, CV_INTER_LINEAR, cv::BORDER_CONSTANT, warp);*/
+  // Half-warping
 
   double d_theta = atan(1.) / double(focal_length);
   double d_phi = atan(1. / double(focal_length) );
@@ -56,14 +49,15 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
   cv::Mat scaled_input;
   cv::resize( input, scaled_input, cv::Size( ceil(R)*input.rows, ceil(R)*input.cols ) );
 
-  std::cout << d_theta << std::endl;
+  /*std::cout << d_theta << std::endl;
   std::cout << d_phi << std::endl;
   std::cout << R_theta << std::endl;
   std::cout << R_phi << std::endl;
   std::cout << R << std::endl;
-  std::cout << ceil(R) << std::endl;
+  std::cout << ceil(R) << std::endl;*/
   
   cv::Mat warp( phi_res, theta_res, CV_8UC3 );
+  mask = cv::Mat::zeros( phi_res, theta_res, CV_8UC1 );
   for(int y = 0; y < scaled_input.rows; y++) {
     for(int x = 0; x < scaled_input.cols; x++) {
       double y_disp = double(y-scaled_input.rows/2)/double(R);
@@ -76,13 +70,14 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
       else
         theta = theta+theta_res/2;
       warp.at<cv::Vec3b>(phi, theta) = scaled_input.at<cv::Vec3b>(y, x);
+      mask.at<unsigned char>(phi, theta) = 1;
     }
   } 
 
   return warp;
 }
 
-void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<cv::Mat>& warped_inputs, int phi_res, int theta_res)
+void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pair<cv::Mat, cv::Mat> >& warped_inputs, int phi_res, int theta_res)
 {
   // Algorithm
   // Select the first image to be the center
@@ -93,8 +88,8 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<cv::Mat>&
   cv::SiftDescriptorExtractor sift_extractor;
   std::vector<KeyPoints> sift_features( warped_inputs.size() );
   std::vector<cv::Mat> descriptors( warped_inputs.size() );
-  for(int i = 0; i < warped_inputs.size(); i++) sift_detector.detect( warped_inputs[i], sift_features[i] );
-  for(int i = 0; i < warped_inputs.size(); i++) sift_extractor.compute( warped_inputs[i], sift_features[i], descriptors[i] );
+  for(int i = 0; i < warped_inputs.size(); i++) sift_detector.detect( warped_inputs[i].first, sift_features[i] );
+  for(int i = 0; i < warped_inputs.size(); i++) sift_extractor.compute( warped_inputs[i].first, sift_features[i], descriptors[i] );
 
   // Perform a pairwise matching between images or incremental build-up
   

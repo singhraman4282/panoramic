@@ -31,8 +31,8 @@ public:
   ros::ServiceServer image_stitcher_;
 
   bool stitch(SphericalStitchRequest& req, SphericalStitchResponse& res);
-  cv::Mat map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int focal_length);
-  void generate_spherical_stitch(cv::Mat& sphere, std::vector<cv::Mat>& warped_inputs, int phi_res, int theta_res);
+  cv::Mat map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask);
+  void generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pair<cv::Mat, cv::Mat> >& warped_inputs, int phi_res, int theta_res);
 
 private:
   // Camera Calibration
