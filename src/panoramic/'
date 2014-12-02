@@ -51,31 +51,30 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
   double d_phi = atan(1. / double(focal_length) );
   double R_theta = d_theta * theta_res / M_PI;
   double R_phi = d_phi * phi_res / M_PI;
-  int R = ceil(std::max( R_theta, R_phi ));
+  double R = std::max( R_theta, R_phi );
   
   cv::Mat scaled_input;
   cv::resize( input, scaled_input, cv::Size( ceil(R)*input.rows, ceil(R)*input.cols ) );
-
+  std::cout << scaled_input.rows << " " << scaled_input.cols << std::endl;
   std::cout << d_theta << std::endl;
   std::cout << d_phi << std::endl;
   std::cout << R_theta << std::endl;
   std::cout << R_phi << std::endl;
   std::cout << R << std::endl;
   std::cout << ceil(R) << std::endl;
-  
+  cv::imshow("scaled_input", scaled_input);
+  cv::waitKey(0);
   cv::Mat warp( phi_res, theta_res, CV_8UC3 );
-  for(int y = 0; y < scaled_input.rows; y++) {
-    for(int x = 0; x < scaled_input.cols; x++) {
-      double y_disp = double(y-scaled_input.rows/2)/double(R);
-      double x_disp = double(x-scaled_input.cols/2)/double(R);
-      int phi = ( atan( y_disp / pow( pow( x_disp, 2 ) + pow( double(focal_length), 2 ) , 0.5 ) )
+  for(int y = 0; y < input.rows; y++) {
+    for(int x = 0; x < input.cols; x++) {
+      int phi = ( atan( double(y-input.rows/2) / pow( pow( double(x-input.cols/2), 2 ) + pow( double(focal_length), 2 ) , 0.5 ) )
           + M_PI/2. ) * double( phi_res ) / M_PI;
-      int theta = atan( x_disp / double(focal_length) ) * double( theta_res ) / M_PI;
+      int theta = atan( double(x-input.cols/2) / double(focal_length) ) * double( theta_res ) / M_PI;
       if(theta >= theta_res/2)
         theta = theta-theta_res/2;
       else
         theta = theta+theta_res/2;
-      warp.at<cv::Vec3b>(phi, theta) = scaled_input.at<cv::Vec3b>(y, x);
+      warp.at<cv::Vec3b>(phi, theta) = input.at<cv::Vec3b>(y, x);
     }
   } 
 
