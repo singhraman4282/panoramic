@@ -85,40 +85,43 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
   return warp;
 }
 
-void Panoramic::generate_spherical_stitch(cv::Mat& sphere, WarpedPairs& warped_inputs, int phi_res, int theta_res)
+void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, int phi_res, int theta_res)
 {
+  // Store all of the final transform in here
+
+  std::vector<nurc::SphericalTransform> relative_transforms(warped_inputs.size() - 1);
   // Perform a pairwise matching between images or incremental build-up
   for(int i = 0; i < warped_inputs.size()-1; i++) {
     // Define references to images
-    cv::Mat query_image = warped_inputs[i].first;
-    cv::Mat train_image = warped_inputs[i+1].first;
+    cv::Mat query_im = warped_inputs[i].first;
+    cv::Mat train_im = warped_inputs[i+1].first;
     cv::Mat query_mask = warped_inputs[i].second;
     cv::Mat train_mask = warped_inputs[i+1].second;
 
     cv::SiftFeatureDetector sift_detector;
     KeyPoints query_kp, train_kp;
-    sift_detector.detect( query_image, query_kp, query_mask);
-    sift_detector.detect( second_image, trian_kp, train_mask);
+    sift_detector.detect( query_im, query_kp, query_mask);
+    sift_detector.detect( train_im, train_kp, train_mask);
 
     cv::SiftDescriptorExtractor sift_features;
     cv::Mat query_features, train_features;
-    sift_features.compute( query_im, query_im, query_features );
+    sift_features.compute( query_im, query_kp, query_features );
     sift_features.compute( train_im, train_kp, train_features );
 
     cv::FlannBasedMatcher feature_matcher;
     std::vector<cv::DMatch> similar_features;
-    matcher.match( query_features, train_features, similar_features );
+    feature_matcher.match( query_features, train_features, similar_features );
 
     double max_dist = 0, min_dist = 100;
-    for( int i = 0; i < query_features.rows; i++ ) { 
-      if( similar_features[i].distance < min_dist ) min_dist = similar_features[i].distance;
-      if( similar_features[i].distance > max_dist ) max_dist = similar_features[i].distance;
+    for(int f = 0; f < query_features.rows; f++) { 
+      if( similar_features[f].distance < min_dist ) min_dist = similar_features[f].distance;
+      if( similar_features[f].distance > max_dist ) max_dist = similar_features[f].distance;
     }
 
     std::vector<cv::DMatch> shared_features;
-    for( int i = 0; i < descriptors_1.rows; i++ ){ 
-      if( similar_features[i].distance <= std::max(2*min_dist, 0.02) )
-        shared_features.push_back( similar_features[i]); 
+    for(int f = 0; f< query_features.rows; f++) { 
+      if( similar_features[f].distance <= std::max( 2*min_dist, 0.02 ) )
+        shared_features.push_back( similar_features[f] ); 
     }
 
     /* Displaying image and outputting some data
@@ -127,42 +130,61 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, WarpedPairs& warped_i
     drawMatches( query_im, query_kp, train_im, train_kp, shared_features, i
                  feature_im, Scalar::all(-1), Scalar::all(-1), std::vector<char>(), 
                  DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-    imshow( "Matched Features", img_matches );
+    imshow( "Matched Features", feature_im );
 
-    for( int i = 0; i < (int)good_matches.size(); i++ ) { 
+    for( int i = 0; i < shared_features.size(); i++ ) { 
       printf( "-- Good Match Points [%d] 1 X-value: %d  1 Y-value: %d -- 2 X-value: %d 2 Y-value: %d \n", i, 
-      (int)keypoints_1[(int)good_matches[i].queryIdx].pt.x, 
-      (int)keypoints_1[(int)good_matches[i].queryIdx].pt.y, 
-      (int)keypoints_2[(int)good_matches[i].trainIdx].pt.x, 
-      (int)keypoints_2[(int)good_matches[i].trainIdx].pt.y 
+      (int)query_kp[ (int)shared_features[i].queryIdx ].pt.x, 
+      (int)query_kp[ (int)shared_featuers[i].queryIdx ].pt.y, 
+      (int)train_kp[ (int)shared_features[i].trainIdx ].pt.x, 
+      (int)train_kp[ (int)shared_features[i].trainIdx ].pt.y 
       ); 
     } */
 
     //RANSAC
-    int max_iterations = (int)good_matches.size();
-    int intlier_threshold = 5;
-    int x_transform = 0;
-    int y_transform = 0;
-    int intlier_count = 0;
-    int best_good_match = 0;
-    for (int i = 0; i < max_iterations; i++) {
-      int temp_x_transform = query_kp[ shared_features[i].queryIdx ].pt.x - train_kp[ shared_features[i].trainIdx ].pt.x
-      int temp_y_transform = query_kp[ shared_features[i].queryIdx ].pt.y - train_kp[ shared_features[i].trainIdx ].pt.y
-      int temp_count = 0;
-      for (int j = 0; j < max_iterations; j++) {
-	if (j == i)
-	  continue
-	int x_transform_diff = query_kp[ shared_features[i].queryIdx ].pt.x - temp_x_transform - train_kp[ shared_features[i].trainIdx ].pt.x;
-	int y_transform_diff = query_kp[ shared_features[i].queryIdx ].pt.y - temp_y_transform - train_kp[ shared_features[i].trainIdx ].pt.y;
-	if (x_transform_diff < 5 && y_transform_diff < 5)
-	  temp_count = temp_count + 1;
+    // Define the maximum allowed deviation in terms of the Phi and Theta angles in radians
+    double max_phi_dev = 5.*(M_PI/180.), max_theta_dev = 5.*(M_PI/180.);
+    double error_threshold = pow( double(max_phi_dev*max_phi_dev + max_theta_dev*max_theta_dev), 0.5 );
+
+    int max_trials = shared_features.size();  // Reduce if this turns out to be too large
+    srand( time(NULL) );
+    for(int j = 0; j < shared_features.size(); j++) {
+      // Algorithm randomly select a pair
+      // compute the transform from the train to query image
+      // calculate the number of inliers
+      // store that number and the transform in the best inlier variables
+      // continue for the maximum number of iterations
+
+      double max_inliers = 0;
+      std::vector<cv::DMatch> r_features = shared_features;
+      r_features.erase( r_features.begin() + i );
+      for(int k = 0; k < max_trials; k++) {
+        // Randomly pick a pair
+        int rand_index = rand() % r_features.size();
+        cv::DMatch rand_feature = r_features[rand_index];
+        r_features.erase( r_features.begin() + rand_index );
+        
+        // Compute the transform
+        int phi_t = query_kp[ r_features[rand_index].queryIdx ].pt.x - train_kp[ r_features[rand_index].trainIdx ].pt.x;
+        int theta_t = query_kp[ r_features[rand_index].queryIdx ].pt.y - train_kp[ r_features[rand_index].trainIdx ].pt.y;
+        nurc::SphericalTransform trial_transform( phi_t, theta_t );
+        
+        // Calculate the number of inliers using the computed transform
+        // If the number of inliers is greater than the previous transform replace
+        int trial_inliers = 0;
+        for(int l = 0; l < r_features.size(); l++) {
+          int trial_phi = query_kp[ r_features[l].queryIdx ].pt.x - train_kp[ r_features[l].trainIdx ].pt.x;
+          int trial_theta = query_kp[ r_features[l].queryIdx ].pt.y - train_kp[ r_features[l].trainIdx ].pt.y;
+          double transform_error = pow( double(trial_phi*trial_phi + trial_theta*trial_theta), 0.5 );
+          if(transform_error < error_threshold) trial_inliers++;
+        }
+
+        if(trial_inliers > max_inliers) {
+          max_inliers = trial_inliers;
+          relative_transforms[i] = trial_transform;
+        }
       }
-      if (temp_count > inlier_count){
-	intlier_count = temp_count;
-	x_transform = temp_x_transform;
-	y_transform = temp_y_transform;
-	best_good_match = i;
-      }
+
     }
   }
 }
