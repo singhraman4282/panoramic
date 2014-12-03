@@ -2,6 +2,7 @@
 #define PANORAMIC_H
 
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <sensor_msgs/Image.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -55,7 +56,7 @@ public:
 
   bool stitch(SphericalStitchRequest& req, SphericalStitchResponse& res);
   cv::Mat warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask);
-  void generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, int phi_res, int theta_res);
+  void generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, std::vector<SphericalTransform>& relative_transforms, int phi_res, int theta_res);
   void hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, SphericalTransform& s_transform, int theta_res, int phi_res);
 
 };

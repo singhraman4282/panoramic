@@ -36,17 +36,27 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   else theta_res = req.theta_res;
 
   cv::Mat sphere( phi_res, 2*theta_res, CV_8UC3 );
-  std::vector< std::pair<cv::Mat, cv::Mat> > image_queue;
+  std::vector<WarpedPair> image_queue;
   for( int i = 0; i < req.queue.size(); i++ ) {
     cv_bridge::CvImagePtr input_image = cv_bridge::toCvCopy( req.queue[i], sensor_msgs::image_encodings::BGR8 );
-    cv::Mat mask;
-    image_queue.push_back( std::pair<cv::Mat, cv::Mat>(warp_to_hsphere( input_image->image, phi_res, theta_res, focal_length, mask ), mask) );
+    cv::Mat warp, mask;
+    warp = warp_to_hsphere( input_image->image, phi_res, theta_res, focal_length, mask );
+    image_queue.push_back( std::pair<cv::Mat, cv::Mat>( warp, mask ) );
   }
 
   ROS_INFO("Successufully generated warped images.");
   ROS_INFO("Generating spherical stitch.");
 
-  generate_image_transforms(sphere, image_queue, phi_res, theta_res);
+  std::vector<SphericalTransform> s_transforms;
+  generate_image_transforms(sphere, image_queue, s_transforms, phi_res, theta_res);
+  
+  SphericalTransform origin(0,0);
+  hsphere_to_sphere(image_queue[0], sphere, origin, theta_res, phi_res);
+  
+  std::string p_path = ros::package::getPath("panoramic");
+  std::stringstream ss;
+  ss << p_path << "/res/images/sphere.jpg";
+  cv::imwrite(ss.str().c_str(), sphere);
   
   return true;
 }
@@ -87,6 +97,13 @@ cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, i
       mask.at<unsigned char>(phi, theta) = 1;
     }
   } 
+
+  static int sn = 0;
+  sn++;
+  std::string p_path = ros::package::getPath("panoramic");
+  std::stringstream ss;
+  ss << p_path << "/res/images/stitched_" << sn << ".jpg";
+  cv::imwrite(ss.str().c_str(), warp);
   
   return warp;
 }
@@ -99,28 +116,30 @@ void Panoramic::hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, Spherica
     for(int theta_index = 0; theta_index < hsphere.first.cols; theta_index++) {
       // Compute the shifts that have compensated for out-of-bounds issues
       int phi_shift = s_transform.phi_+phi_index-hc_phi, theta_shift = s_transform.theta_+theta_index-hc_theta;
+      // std::cout << phi_shift << " " << theta_shift << std::endl;
       if(phi_shift < 0)
         phi_shift += phi_res;
       else if(phi_shift >= phi_res)
         phi_shift = phi_res - phi_shift;
       if(theta_shift < 0)
         theta_shift += theta_res;
-      else if(theta_shift < 0)
+      else if(theta_shift >= theta_res)
         theta_shift = theta_res - theta_shift;
 
       // Check the mask to make sure that this is part of the warped image and assign if so
       if(hsphere.second.at<unsigned int>(phi_index, theta_index) == 1)
         sphere.at<cv::Vec3b>(phi_shift, theta_shift) = hsphere.first.at<cv::Vec3b>(phi_index, theta_index);
+      //  std::cout << 1 << std::endl;
     }
   }
 }
 
-void Panoramic::generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, int phi_res, int theta_res)
+void Panoramic::generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, std::vector<SphericalTransform>& relative_transforms, int phi_res, int theta_res)
 {
   ROS_INFO("Beginning spherical stitch generation.");
 
   // Store all of the final transform in here
-  std::vector<nurc::SphericalTransform> relative_transforms(warped_inputs.size() - 1);
+  relative_transforms.resize(warped_inputs.size() - 1);
   // Perform a pairwise matching between images or incremental build-up
   for(int i = 0; i < warped_inputs.size()-1; i++) {
     ROS_INFO("Matching images %d and %d.", i, i+1);
