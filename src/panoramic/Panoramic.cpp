@@ -41,8 +41,20 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   std::vector<WarpedPair> image_queue;
   for( int i = 0; i < req.queue.size(); i++ ) {
     cv_bridge::CvImagePtr input_image = cv_bridge::toCvCopy( req.queue[i], sensor_msgs::image_encodings::BGR8 );
+    
+    cv::Mat& input_uncalibrated = input_image->image;
+    cv::Mat input_calibrated;
+    cv::Mat K(3, 3, CV_64FC3);
+    cv::Mat D(1, 5, CV_64FC3);
+    // Fix any spherical distortion in the image using the camera information
+    if(std::string("plumb_bob") == req.camera_info.distortion_model) {
+      K.at<double>(0,0) = req.camera_info.K[0];
+      cv::undistort(input_uncalibrated, input_calibrated, K, D);
+    }
+    else input_calibrated = input_image->image;
+
     cv::Mat warp, mask( phi_res, theta_res, CV_8UC1, cv::Scalar(0) );
-    warp = warp_to_hsphere( input_image->image, phi_res, theta_res, s, mask );
+    warp = warp_to_hsphere( input_calibrated, phi_res, theta_res, s, mask );
     image_queue.push_back( WarpedPair( warp, mask ) );
   }
 
