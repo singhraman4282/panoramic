@@ -78,8 +78,9 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   generate_image_transforms(sphere, image_queue, s_transforms, phi_res, theta_res);
   
   SphericalTransform t(0,0);
+  cv::Mat distortions(sphere.rows, sphere.cols, CV_32FC1, cv::Scalar(FLT_MAX));
   for(int i = 0; i < image_queue.size(); i++) {
-    hsphere_to_sphere(image_queue[i], sphere, t, theta_res, phi_res);
+    hsphere_to_sphere(image_queue[i], sphere, t, theta_res, phi_res, distortions);
     if(i < s_transforms.size()) {
       t.phi_ += s_transforms[i].phi_;
       t.theta_ += s_transforms[i].theta_;
@@ -89,7 +90,7 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   std::string p_path = ros::package::getPath("panoramic");
   std::stringstream ss;
 
-  std::vector<WarpedPair> reflected;
+  /*std::vector<WarpedPair> reflected;
   generate_reflected_images(image_queue, reflected, s_transforms, phi_res, theta_res);
   for(int i = 0; i < reflected.size(); i++) {
     ROS_INFO("Reflected %d: (%d, %d)", i, reflected[i].first.rows, reflected[i].first.cols);
@@ -102,8 +103,7 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     ss << p_path << "/res/images/reflected_mask_" << i << ".jpg";
     cv::imwrite(ss.str().c_str(), reflected[i].second);
   }
-
-  // blend_sphere(image_queue, sphere, s_transforms, phi_res, theta_res);
+  blend_sphere(reflected, sphere, s_transforms, phi_res, theta_res);*/
 
   ss.clear();
   ss.str( std::string() );
@@ -114,6 +114,12 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   ss.str( std::string() );
   ss << p_path << "/res/images/sphere.jpg";
   cv::imwrite(ss.str().c_str(), sphere);
+
+  std_msgs::Header im_header;
+  im_header.stamp = ros::Time::now();
+  im_header.frame_id = std::string("Panoramic Spherical Image");
+  cv_bridge::CvImage mat_converter(im_header, std::string("bgr8"), sphere);
+  mat_converter.toImageMsg( res.stitch );
   
   return true;
 }
@@ -145,7 +151,7 @@ void Panoramic::generate_reflected_images(std::vector<WarpedPair>& warped_inputs
         else if(theta_shift >= sphere_s.width)
           theta_shift = sphere_s.width - theta_shift;
 
-        // Check if there needs to be a reflection
+        // Check if there needs to be a reflected
         bool phi_reflected = (phi_shift <= expansion || (sphere_s.height-phi_shift) <= expansion);
         bool theta_reflected = (theta_shift <= expansion || (sphere_s.width-theta_shift) <= expansion);
         bool reflected = phi_reflected || theta_reflected;
@@ -156,17 +162,19 @@ void Panoramic::generate_reflected_images(std::vector<WarpedPair>& warped_inputs
               reflectp_phi = sphere_s.height+phi_shift;
             else if( (sphere_s.height-phi_shift) <= expansion )
               reflectp_phi = (phi_shift-sphere_s.height);
-            else 
-              reflectp_phi = phi_shift;
           }
+          else 
+            reflectp_phi = phi_shift;
+
           if(theta_reflected) {
             if( theta_shift <= expansion )
               reflectp_theta = sphere_s.width+theta_shift;
             else if( (sphere_s.width-theta_shift) <= expansion )
               reflectp_theta = (theta_shift-sphere_s.width);
-            else
-              reflectp_theta = theta_shift;
           }
+          else
+            reflectp_theta = theta_shift;
+
           if(warped_inputs[i].second.at<uchar>(phi_index, theta_index) != 0) {
             expanded_image.at<cv::Vec3b>(reflectp_phi, reflectp_theta) = warped_inputs[i].first.at<cv::Vec3b>(phi_index, theta_index);
             expanded_mask.at<uchar>(reflectp_phi, reflectp_theta) = warped_inputs[i].second.at<uchar>(phi_index, theta_index);
@@ -194,34 +202,27 @@ void Panoramic::generate_reflected_images(std::vector<WarpedPair>& warped_inputs
   }
 }
 
-void Panoramic::blend_sphere(std::vector<WarpedPair>& warped_inputs, cv::Mat& sphere, std::vector<SphericalTransform>& s_transforms, int phi_res, int theta_res)
+void Panoramic::blend_sphere(std::vector<WarpedPair>& reflected_inputs, cv::Mat& sphere, std::vector<SphericalTransform>& s_transforms, int phi_res, int theta_res, int expansion)
 {
   // OpenCV Image Blending
-  // Maximum size at the boundaries is given by max image size
-  cv::Mat expanded_sphere( 3 * phi_res, 4 * theta_res, CV_8UC3 );
+  // Maximum size at the boundaries is given by sphere size
+  cv::Mat expanded_sphere( sphere.rows + 2 * expansion, sphere.cols + 2 * expansion, CV_8UC3 );
   cv::detail::MultiBandBlender mbb(false, 100);
   int esc_phi = expanded_sphere.rows/2;
   int esc_theta = expanded_sphere.cols/2;
-  SphericalTransform t(0,0);
   mbb.prepare( cv::Rect( 0, 0, expanded_sphere.rows-1, expanded_sphere.cols-1 ) );
-  for(int i = 0; i < warped_inputs.size(); i++) {
-    // Using the spherical transforms compute all of the corners in order
-    int wic_phi = warped_inputs[i].first.rows/2;
-    int wic_theta = warped_inputs[i].first.cols/2;
-    int tl_y, tl_x;
-    tl_y = t.phi_-wic_phi+esc_phi;
-    tl_x = t.theta_-wic_theta+esc_theta;
-    ROS_INFO("%d %d", tl_y, tl_x);
-    mbb.feed( warped_inputs[i].first, warped_inputs[i].second, cv::Point(tl_x, tl_y) );
+  for(int i = 0; i < reflected_inputs.size(); i++)
+    mbb.feed( reflected_inputs[i].first, reflected_inputs[i].second, cv::Point(0,0) );
+  cv::Mat entire_sphere = cv::Mat::ones( expanded_sphere.rows, expanded_sphere.cols, CV_8UC1 );
+  mbb.blend( expanded_sphere, entire_sphere );
 
-    if(i < s_transforms.size()) {
-      t.phi_ += s_transforms[i].phi_;
-      t.theta_ += s_transforms[i].theta_;
+  // Transfer blended images to sphere
+  for(int phi_index = 0; phi_index < sphere.rows; phi_index++) {
+    for(int theta_index = 0; theta_index < sphere.cols; theta_index++) {
+      sphere.at<cv::Vec3b>(phi_index, theta_index) = expanded_sphere.at<cv::Vec3b>(phi_index+expansion, theta_index+expansion);
     }
   }
-  cv::Mat o = cv::Mat::ones( expanded_sphere.rows, expanded_sphere.cols, CV_8UC1 );
-  mbb.blend( expanded_sphere, o );
-
+  
   std::string p_path = ros::package::getPath("panoramic");
   std::stringstream ss;
   ss << p_path << "/res/images/expanded_sphere.jpg";
@@ -276,7 +277,7 @@ cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, i
   return warp;
 }
 
-void Panoramic::hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, SphericalTransform& s_transform, int theta_res, int phi_res)
+void Panoramic::hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, SphericalTransform& s_transform, int theta_res, int phi_res, cv::Mat& distortions)
 {
   int hc_theta = hsphere.first.cols/2;
   int hc_phi = hsphere.first.rows/2;
@@ -297,7 +298,13 @@ void Panoramic::hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, Spherica
         theta_shift = sphere.cols - theta_shift;
 
       // Check the mask to make sure that this is part of the warped image and assign if so
-      if(hsphere.second.at<uchar>(phi_index, theta_index) != 0) {
+      // Calculate the distortion at that point
+      int phi_diff = (hc_phi - phi_index);
+      int theta_diff = (hc_theta - theta_index);
+      float distortion_t = pow( float(phi_diff*phi_diff + theta_diff*theta_diff), 0.5 ); 
+      if(hsphere.second.at<uchar>(phi_index, theta_index) != 0 
+          && distortions.at<float>(phi_shift, theta_shift) > distortion_t) {
+        distortions.at<float>(phi_shift, theta_shift) = distortion_t;
         sphere.at<cv::Vec3b>(phi_shift, theta_shift) = hsphere.first.at<cv::Vec3b>(phi_index, theta_index);
       }
     }
