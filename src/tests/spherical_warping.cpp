@@ -26,7 +26,7 @@ int main(int argc, char** argv)
   
   nurc::Panoramic p_server;
   cv::Mat mask;
-  cv::Mat warped = p_server.map_to_sphere(sample, 1000, 1000, focal_length, mask);
+  cv::Mat warped = p_server.warp_to_hsphere(sample, 1000, 1000, focal_length, mask);
   
   cv::imshow(input_path.c_str(), sample);
   cv::imshow("Warped", warped);

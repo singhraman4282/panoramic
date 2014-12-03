@@ -32,8 +32,8 @@ int main(int argc, char** argv)
 
   nurc::Panoramic p_server;
   cv::Mat first_mask, second_mask;
-  cv::Mat first_warped = p_server.map_to_sphere(first_sample, 1000, 1000, focal_length, first_mask);
-  cv::Mat second_warped = p_server.map_to_sphere(second_sample, 1000, 1000, focal_length, second_mask);
+  cv::Mat first_warped = p_server.warp_to_hsphere(first_sample, 1000, 1000, focal_length, first_mask);
+  cv::Mat second_warped = p_server.warp_to_hsphere(second_sample, 1000, 1000, focal_length, second_mask);
   
   cv::imshow(first_path.c_str(), first_sample);
   cv::imshow(second_path.c_str(), second_sample);

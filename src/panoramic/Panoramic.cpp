@@ -35,23 +35,23 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     theta_res = (int)round(double( 2. * M_PI ) / atan( 1. / focal_length ) );
   else theta_res = req.theta_res;
 
-  cv::Mat sphere( phi_res, theta_res, CV_8UC3 );
+  cv::Mat sphere( phi_res, 2*theta_res, CV_8UC3 );
   std::vector< std::pair<cv::Mat, cv::Mat> > image_queue;
   for( int i = 0; i < req.queue.size(); i++ ) {
     cv_bridge::CvImagePtr input_image = cv_bridge::toCvCopy( req.queue[i], sensor_msgs::image_encodings::BGR8 );
     cv::Mat mask;
-    image_queue.push_back( std::pair<cv::Mat, cv::Mat>(map_to_sphere( input_image->image, phi_res, theta_res, focal_length, mask ), mask) );
+    image_queue.push_back( std::pair<cv::Mat, cv::Mat>(warp_to_hsphere( input_image->image, phi_res, theta_res, focal_length, mask ), mask) );
   }
 
   ROS_INFO("Successufully generated warped images.");
   ROS_INFO("Generating spherical stitch.");
 
-  generate_spherical_stitch(sphere, image_queue, phi_res, theta_res);
+  generate_image_transforms(sphere, image_queue, phi_res, theta_res);
   
   return true;
 }
 
-cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask)
+cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask)
 {
   // Warp planar image to half-sphere with resolution given by inputs
 
@@ -91,7 +91,31 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
   return warp;
 }
 
-void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, int phi_res, int theta_res)
+void Panoramic::hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, SphericalTransform& s_transform, int theta_res, int phi_res)
+{
+  int hc_theta = hsphere.first.cols/2;
+  int hc_phi = hsphere.first.rows/2;
+  for(int phi_index = 0; phi_index < hsphere.first.rows; phi_index++) {
+    for(int theta_index = 0; theta_index < hsphere.first.cols; theta_index++) {
+      // Compute the shifts that have compensated for out-of-bounds issues
+      int phi_shift = s_transform.phi_+phi_index-hc_phi, theta_shift = s_transform.theta_+theta_index-hc_theta;
+      if(phi_shift < 0)
+        phi_shift += phi_res;
+      else if(phi_shift >= phi_res)
+        phi_shift = phi_res - phi_shift;
+      if(theta_shift < 0)
+        theta_shift += theta_res;
+      else if(theta_shift < 0)
+        theta_shift = theta_res - theta_shift;
+
+      // Check the mask to make sure that this is part of the warped image and assign if so
+      if(hsphere.second.at<unsigned int>(phi_index, theta_index) == 1)
+        sphere.at<cv::Vec3b>(phi_shift, theta_shift) = hsphere.first.at<cv::Vec3b>(phi_index, theta_index);
+    }
+  }
+}
+
+void Panoramic::generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, int phi_res, int theta_res)
 {
   ROS_INFO("Beginning spherical stitch generation.");
 
@@ -122,14 +146,10 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<WarpedPai
     feature_matcher.match( query_features, train_features, similar_features );
 
     double max_dist = 0, min_dist = 100;
-    for(int f = 0; f < query_features.rows; f++) { 
-      if( similar_features[f].distance < min_dist ) min_dist = similar_features[f].distance;
-      if( similar_features[f].distance > max_dist ) max_dist = similar_features[f].distance;
-    }
-
+    min_dist = std::min_element( similar_features.begin(), similar_features.end(), nurc::DMatchDistanceCompare )->distance;
     std::vector<cv::DMatch> shared_features;
     for(int f = 0; f< query_features.rows; f++) { 
-      if( similar_features[f].distance <= std::max( 2*min_dist, 0.02 ) )
+      if( similar_features[f].distance <= std::max( 20*min_dist, 0.02 ) )
         shared_features.push_back( similar_features[f] ); 
     }
 
@@ -156,19 +176,19 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<WarpedPai
         r_features.erase( r_features.begin() + rand_index );
         
         // Compute the transform
-        int phi_t = query_kp[ (int)rand_feature.queryIdx ].pt.x - train_kp[ (int)rand_feature.trainIdx ].pt.x;
-        int theta_t = query_kp[ (int)rand_feature.queryIdx ].pt.y - train_kp[ (int)rand_feature.trainIdx ].pt.y;
+        int theta_t = query_kp[ (int)rand_feature.queryIdx ].pt.x - train_kp[ (int)rand_feature.trainIdx ].pt.x;
+        int phi_t = query_kp[ (int)rand_feature.queryIdx ].pt.y - train_kp[ (int)rand_feature.trainIdx ].pt.y;
         nurc::SphericalTransform trial_transform( phi_t, theta_t );
         
         // Calculate the number of inliers using the computed transform
         // If the number of inliers is greater than the previous transform replace
         int trial_inliers = 0;
         for(int l = 0; l < r_features.size(); l++) {
-          int trial_phi = query_kp[ (int)r_features[l].queryIdx ].pt.x - train_kp[ (int)r_features[l].trainIdx ].pt.x;
-          int trial_theta = query_kp[ (int)r_features[l].queryIdx ].pt.y - train_kp[ (int)r_features[l].trainIdx ].pt.y;
+          int trial_theta = query_kp[ (int)r_features[l].queryIdx ].pt.x - train_kp[ (int)r_features[l].trainIdx ].pt.x;
+          int trial_phi = query_kp[ (int)r_features[l].queryIdx ].pt.y - train_kp[ (int)r_features[l].trainIdx ].pt.y;
 
-          double phi_error = double(trial_phi - phi_t)*(M_PI/double(phi_res));
           double theta_error = double(trial_theta - theta_t)*(M_PI/double(theta_res));
+          double phi_error = double(trial_phi - phi_t)*(M_PI/double(phi_res));
           double transform_error = pow( double(phi_error*phi_error + theta_error*theta_error), 0.5 );
           if(transform_error < error_threshold) trial_inliers++;
         }

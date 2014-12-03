@@ -33,6 +33,11 @@ struct SphericalTransform {
   int phi_;
   int theta_;
 };
+
+bool DMatchDistanceCompare(cv::DMatch a, cv::DMatch b)
+{
+  return a.distance < b.distance;
+}
   
 class Panoramic {
 public:
@@ -49,11 +54,10 @@ public:
   ros::ServiceServer image_stitcher_;
 
   bool stitch(SphericalStitchRequest& req, SphericalStitchResponse& res);
-  cv::Mat map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask);
-  void generate_spherical_stitch(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, int phi_res, int theta_res);
+  cv::Mat warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask);
+  void generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, int phi_res, int theta_res);
+  void hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, SphericalTransform& s_transform, int theta_res, int phi_res);
 
-private:
-  // Camera Calibration
 };
 
 } // namespace nurc

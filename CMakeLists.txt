@@ -124,13 +124,6 @@ target_link_libraries(panoramic
     panoramiclib
 )
 
-add_executable(test_panoramic src/test_panoramic.cpp)
-target_link_libraries(test_panoramic
-    ${catkin_LIBRARIES}
-    ${OpenCV_LIBRARIES}
-    panoramiclib
-)
-
 add_executable(camera_video_publisher src/camera_video_publisher)
 target_link_libraries(camera_video_publisher
     ${catkin_LIBRARIES}
