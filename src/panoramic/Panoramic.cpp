@@ -124,23 +124,6 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<WarpedPai
         shared_features.push_back( similar_features[f] ); 
     }
 
-    /* Displaying image and outputting some data
-
-    &cv::Mat feature_im;
-    drawMatches( query_im, query_kp, train_im, train_kp, shared_features, i
-                 feature_im, Scalar::all(-1), Scalar::all(-1), std::vector<char>(), 
-                 DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-    imshow( "Matched Features", feature_im );
-
-    for( int i = 0; i < shared_features.size(); i++ ) { 
-      printf( "-- Good Match Points [%d] 1 X-value: %d  1 Y-value: %d -- 2 X-value: %d 2 Y-value: %d \n", i, 
-      (int)query_kp[ (int)shared_features[i].queryIdx ].pt.x, 
-      (int)query_kp[ (int)shared_featuers[i].queryIdx ].pt.y, 
-      (int)train_kp[ (int)shared_features[i].trainIdx ].pt.x, 
-      (int)train_kp[ (int)shared_features[i].trainIdx ].pt.y 
-      ); 
-    } */
-
     //RANSAC
     // Define the maximum allowed deviation in terms of the Phi and Theta angles in radians
     double max_phi_dev = 5.*(M_PI/180.), max_theta_dev = 5.*(M_PI/180.);
@@ -148,16 +131,12 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<WarpedPai
 
     int max_trials = shared_features.size();  // Reduce if this turns out to be too large
     srand( time(NULL) );
-    for(int j = 0; j < shared_features.size(); j++) {
-      // Algorithm randomly select a pair
-      // compute the transform from the train to query image
-      // calculate the number of inliers
-      // store that number and the transform in the best inlier variables
-      // continue for the maximum number of iterations
-
-      double max_inliers = 0;
+    for(int j = 0; j < shared_features.size()-1; j++) {
+      // Initilize inlier tracking
+      int max_inliers = 0;
       std::vector<cv::DMatch> r_features = shared_features;
       r_features.erase( r_features.begin() + i );
+
       for(int k = 0; k < max_trials; k++) {
         // Randomly pick a pair
         int rand_index = rand() % r_features.size();
@@ -178,7 +157,6 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector<WarpedPai
           double transform_error = pow( double(trial_phi*trial_phi + trial_theta*trial_theta), 0.5 );
           if(transform_error < error_threshold) trial_inliers++;
         }
-
         if(trial_inliers > max_inliers) {
           max_inliers = trial_inliers;
           relative_transforms[i] = trial_transform;
