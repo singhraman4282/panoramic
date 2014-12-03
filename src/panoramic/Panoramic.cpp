@@ -19,29 +19,31 @@ Panoramic::Panoramic() :
 
 Panoramic::~Panoramic()
 {
-
 }
 
 bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res)
 {
   ROS_INFO("Received stitch request. Generating warped images.");
 
-  double focal_length = 300;      // Approximate -- needs better defining
+  double s;
   int theta_res, phi_res;
   if(req.phi_res == SphericalStitchRequest::MAX_RES)
-    phi_res = (int)round(double( 2. * M_PI ) / atan( 1. /focal_length ) );
+    phi_res = (int)round(double( 2. * M_PI ) / atan( 1. /s ) );
   else phi_res = req.phi_res;
   if(req.theta_res == SphericalStitchRequest::MAX_RES)
-    theta_res = (int)round(double( 2. * M_PI ) / atan( 1. / focal_length ) );
+    theta_res = (int)round(double( 2. * M_PI ) / atan( 1. / s ) );
   else theta_res = req.theta_res;
+  if(req.s == SphericalStitchRequest::FOCAL_LENGTH)
+    s = 500;
+  else s = req.s;
 
   cv::Mat sphere( phi_res, 2*theta_res, CV_8UC3 );
   std::vector<WarpedPair> image_queue;
   for( int i = 0; i < req.queue.size(); i++ ) {
     cv_bridge::CvImagePtr input_image = cv_bridge::toCvCopy( req.queue[i], sensor_msgs::image_encodings::BGR8 );
-    cv::Mat warp, mask;
-    warp = warp_to_hsphere( input_image->image, phi_res, theta_res, focal_length, mask );
-    image_queue.push_back( std::pair<cv::Mat, cv::Mat>( warp, mask ) );
+    cv::Mat warp, mask( phi_res, theta_res, CV_8UC1, cv::Scalar(0) );
+    warp = warp_to_hsphere( input_image->image, phi_res, theta_res, s, mask );
+    image_queue.push_back( WarpedPair( warp, mask ) );
   }
 
   ROS_INFO("Successufully generated warped images.");
@@ -50,11 +52,22 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   std::vector<SphericalTransform> s_transforms;
   generate_image_transforms(sphere, image_queue, s_transforms, phi_res, theta_res);
   
-  SphericalTransform origin(0,0);
-  hsphere_to_sphere(image_queue[0], sphere, origin, theta_res, phi_res);
-  
+  SphericalTransform t(0,0);
+  for(int i = 0; i < image_queue.size(); i++) {
+    hsphere_to_sphere(image_queue[i], sphere, t, theta_res, phi_res);
+    if(i < s_transforms.size()) {
+      t.phi_ += s_transforms[i].phi_;
+      t.theta_ += s_transforms[i].theta_;
+    }
+  }
+
   std::string p_path = ros::package::getPath("panoramic");
   std::stringstream ss;
+  ss << p_path << "/res/images/mask.jpg";
+  cv::imwrite(ss.str().c_str(), image_queue[0].second);
+  
+  ss.clear();
+  ss.str( std::string() );
   ss << p_path << "/res/images/sphere.jpg";
   cv::imwrite(ss.str().c_str(), sphere);
   
@@ -73,13 +86,13 @@ cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, i
   double R_phi = d_phi * phi_res / M_PI;
   int R = ceil(std::max( R_theta, R_phi ));
   
-  // Scaling of the input image will correct issues with uncompatible sizes
+  // Scaling of the input image will correct issues with incompatible sizes
   cv::Mat scaled_input;
   cv::resize( input, scaled_input, cv::Size( ceil(R)*input.rows, ceil(R)*input.cols ) );
   
   // Warped image will be indexed using phi and theta coordinates
   cv::Mat warp( phi_res, theta_res, CV_8UC3 );
-  mask = cv::Mat::zeros( phi_res, theta_res, CV_8UC1 );
+  // mask = cv::Mat::zeros( phi_res, theta_res, CV_8UC1 );
   for(int y = 0; y < scaled_input.rows; y++) {
     for(int x = 0; x < scaled_input.cols; x++) {
       // Compute transforms
@@ -94,7 +107,7 @@ cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, i
 
       // Map
       warp.at<cv::Vec3b>(phi, theta) = scaled_input.at<cv::Vec3b>(y, x);
-      mask.at<unsigned char>(phi, theta) = 1;
+      mask.at<unsigned char>(phi, theta) = 255;
     }
   } 
 
@@ -112,24 +125,26 @@ void Panoramic::hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, Spherica
 {
   int hc_theta = hsphere.first.cols/2;
   int hc_phi = hsphere.first.rows/2;
+  int s_theta = sphere.cols/2;
+  int s_phi = sphere.rows/2;
   for(int phi_index = 0; phi_index < hsphere.first.rows; phi_index++) {
     for(int theta_index = 0; theta_index < hsphere.first.cols; theta_index++) {
       // Compute the shifts that have compensated for out-of-bounds issues
-      int phi_shift = s_transform.phi_+phi_index-hc_phi, theta_shift = s_transform.theta_+theta_index-hc_theta;
-      // std::cout << phi_shift << " " << theta_shift << std::endl;
+      int phi_shift = (s_transform.phi_+phi_index-hc_phi+s_phi) % sphere.rows;
+      int theta_shift = (s_transform.theta_+theta_index-hc_theta+s_theta) % sphere.cols;
       if(phi_shift < 0)
-        phi_shift += phi_res;
-      else if(phi_shift >= phi_res)
-        phi_shift = phi_res - phi_shift;
+        phi_shift += sphere.rows;
+      else if(phi_shift >= sphere.rows)
+        phi_shift = sphere.rows - phi_shift;
       if(theta_shift < 0)
-        theta_shift += theta_res;
-      else if(theta_shift >= theta_res)
-        theta_shift = theta_res - theta_shift;
+        theta_shift += sphere.cols;
+      else if(theta_shift >= sphere.cols)
+        theta_shift = sphere.cols - theta_shift;
 
       // Check the mask to make sure that this is part of the warped image and assign if so
-      if(hsphere.second.at<unsigned int>(phi_index, theta_index) == 1)
+      if(hsphere.second.at<unsigned char>(phi_index, theta_index) != 0) {
         sphere.at<cv::Vec3b>(phi_shift, theta_shift) = hsphere.first.at<cv::Vec3b>(phi_index, theta_index);
-      //  std::cout << 1 << std::endl;
+      }
     }
   }
 }
