@@ -42,19 +42,32 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   for( int i = 0; i < req.queue.size(); i++ ) {
     cv_bridge::CvImagePtr input_image = cv_bridge::toCvCopy( req.queue[i], sensor_msgs::image_encodings::BGR8 );
     
-    cv::Mat& input_uncalibrated = input_image->image;
-    cv::Mat input_calibrated;
+    cv::Mat input_uncalibrated = input_image->image.clone();
+    /*cv::Mat input_calibrated;
     cv::Mat K(3, 3, CV_64FC3);
     cv::Mat D(1, 5, CV_64FC3);
     // Fix any spherical distortion in the image using the camera information
     if(std::string("plumb_bob") == req.camera_info.distortion_model) {
       K.at<double>(0,0) = req.camera_info.K[0];
-      cv::undistort(input_uncalibrated, input_calibrated, K, D);
+      K.at<double>(0,1) = req.camera_info.K[1];
+      K.at<double>(0,2) = req.camera_info.K[2];
+      K.at<double>(1,1) = req.camera_info.K[3];
+      K.at<double>(1,2) = req.camera_info.K[4];
+      K.at<double>(1,3) = req.camera_info.K[5];
+      K.at<double>(2,1) = req.camera_info.K[6];
+      K.at<double>(2,2) = req.camera_info.K[7];
+      K.at<double>(2,3) = req.camera_info.K[8];
+      D.at<double>(0,0) = req.camera_info.D[0];
+      D.at<double>(0,1) = req.camera_info.D[1];
+      D.at<double>(0,2) = req.camera_info.D[2];
+      D.at<double>(0,3) = req.camera_info.D[3];
+      D.at<double>(0,4) = req.camera_info.D[4];
+      // cv::undistort(input_uncalibrated, input_calibrated, K, D);
     }
-    else input_calibrated = input_image->image;
+    else input_calibrated = input_image->image;*/
 
     cv::Mat warp, mask( phi_res, theta_res, CV_8UC1, cv::Scalar(0) );
-    warp = warp_to_hsphere( input_calibrated, phi_res, theta_res, s, mask );
+    warp = warp_to_hsphere( input_uncalibrated, phi_res, theta_res, s, mask );
     image_queue.push_back( WarpedPair( warp, mask ) );
   }
 
@@ -73,6 +86,8 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     }
   }
 
+  blend_sphere(image_queue, sphere, s_transforms, phi_res, theta_res);
+
   std::string p_path = ros::package::getPath("panoramic");
   std::stringstream ss;
   ss << p_path << "/res/images/mask.jpg";
@@ -84,6 +99,28 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   cv::imwrite(ss.str().c_str(), sphere);
   
   return true;
+}
+
+void Panoramic::blend_sphere(std::vector<WarpedPair>& warped_inputs, cv::Mat& sphere, std::vector<SphericalTransform>& s_transforms, int phi_res, int theta_res)
+{
+  // Laplacian Pyramid
+  // Downsample, blend, then upsample
+  Pyramid p;
+  p.push_back(warped_inputs);
+  for(int i = 0; i < 3; i++) {
+    std::vector<WarpedPair> level;
+    for(int j = 0; j < p[i].size(); j++) {
+      cv::Mat p_im, p_mask;
+      pyrDown( p[i][j].first, p_im );
+      pyrDown( p[i][j].second, p_mask );
+      level.push_back( WarpedPair( p_im,  p_mask) );
+    }
+    p.push_back( level );
+  }
+  std::cout << "Building pyramid: " << p.size() << std::endl; 
+  // Blend with respect to masks at each level
+
+  // Reconstruct
 }
 
 cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask)
