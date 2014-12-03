@@ -51,6 +51,7 @@ public:
   typedef std::vector<cv::KeyPoint> KeyPoints;
   typedef std::pair<cv::Mat, cv::Mat> WarpedPair;
   typedef std::vector< std::vector<WarpedPair> > Pyramid;
+  typedef unsigned char uchar;
 
   Panoramic();
   ~Panoramic();
@@ -63,7 +64,7 @@ public:
   void generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPair>& warped_inputs, std::vector<SphericalTransform>& relative_transforms, int phi_res, int theta_res);
   void hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, SphericalTransform& s_transform, int theta_res, int phi_res);
   void blend_sphere(std::vector<WarpedPair>& warped_inputs, cv::Mat& sphere, std::vector<SphericalTransform>& s_transforms, int phi_res, int theta_res);
-  void generate_reflected_images(std::vector<WarpedPair>& warped_inputs, std::vector<WarpedPair>& reflected, int expansion = 4, int phi_res, int theta_res);
+  void generate_reflected_images(std::vector<WarpedPair>& warped_inputs, std::vector<WarpedPair>& reflected, std::vector<SphericalTransform>& s_transforms, int phi_res, int theta_res, int expansion = 4);
 
 };
 

@@ -86,10 +86,27 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     }
   }
 
-  blend_sphere(image_queue, sphere, s_transforms, phi_res, theta_res);
-
   std::string p_path = ros::package::getPath("panoramic");
   std::stringstream ss;
+
+  std::vector<WarpedPair> reflected;
+  generate_reflected_images(image_queue, reflected, s_transforms, phi_res, theta_res);
+  for(int i = 0; i < reflected.size(); i++) {
+    ROS_INFO("Reflected %d: (%d, %d)", i, reflected[i].first.rows, reflected[i].first.cols);
+    ss.clear();
+    ss.str( std::string() );
+    ss << p_path << "/res/images/reflected_im_" << i << ".jpg";
+    cv::imwrite(ss.str().c_str(), reflected[i].first);
+    ss.clear();
+    ss.str( std::string() );
+    ss << p_path << "/res/images/reflected_mask_" << i << ".jpg";
+    cv::imwrite(ss.str().c_str(), reflected[i].second);
+  }
+
+  // blend_sphere(image_queue, sphere, s_transforms, phi_res, theta_res);
+
+  ss.clear();
+  ss.str( std::string() );
   ss << p_path << "/res/images/mask.jpg";
   cv::imwrite(ss.str().c_str(), image_queue[0].second);
   
@@ -101,12 +118,81 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   return true;
 }
 
-/*void Panoramic::generated_reflected_images(std::vector<WarpedPair>& warped_inputs, std::vector<WarpedPair>& reflected, int expansion)
+void Panoramic::generate_reflected_images(std::vector<WarpedPair>& warped_inputs, std::vector<WarpedPair>& reflected, std::vector<SphericalTransform>& s_transforms,  int phi_res, int theta_res, int expansion)
 {
+  ROS_INFO("Generating reflected images.");
+  // Wrap the images around an expanded sphere to blending
+  SphericalTransform t(0,0);
   for(int i = 0; i < warped_inputs.size(); i++) {
-    cv::Mat expanded_image, expanded_mask;
+    // Size is set in width, height format
+    cv::Size sphere_s( 2 * theta_res, phi_res );
+    cv::Mat expanded_image( sphere_s.height + 2 * expansion, sphere_s.width + 2 * expansion, warped_inputs[i].first.type() );
+    cv::Mat expanded_mask( sphere_s.height + 2 * expansion, sphere_s.width + 2 * expansion, warped_inputs[i].second.type() );
+    int hc_phi = warped_inputs[i].first.rows/2;
+    int hc_theta = warped_inputs[i].first.cols/2;
+    int sc_phi = sphere_s.height/2;
+    int sc_theta = sphere_s.width/2;
+    for(int phi_index = 0; phi_index < warped_inputs[i].first.rows; phi_index++) {
+      for(int theta_index = 0; theta_index < warped_inputs[i].first.cols; theta_index++) {
+        int phi_shift = (t.phi_+phi_index-hc_phi+sc_phi) % sphere_s.height;
+        int theta_shift = (t.theta_+theta_index-hc_theta+sc_theta) % sphere_s.width;
+        if(phi_shift < 0)
+          phi_shift += sphere_s.height;
+        else if(phi_shift >= sphere_s.height)
+          phi_shift = sphere_s.height - phi_shift;
+        if(theta_shift < 0)
+          theta_shift += sphere_s.width;
+        else if(theta_shift >= sphere_s.width)
+          theta_shift = sphere_s.width - theta_shift;
+
+        // Check if there needs to be a reflection
+        bool phi_reflected = (phi_shift <= expansion || (sphere_s.height-phi_shift) <= expansion);
+        bool theta_reflected = (theta_shift <= expansion || (sphere_s.width-theta_shift) <= expansion);
+        bool reflected = phi_reflected || theta_reflected;
+        int reflectp_phi, reflectp_theta;
+        if(reflected) {
+          if(phi_reflected) {
+            if( phi_shift <= expansion )
+              reflectp_phi = sphere_s.height+phi_shift;
+            else if( (sphere_s.height-phi_shift) <= expansion )
+              reflectp_phi = (phi_shift-sphere_s.height);
+            else 
+              reflectp_phi = phi_shift;
+          }
+          if(theta_reflected) {
+            if( theta_shift <= expansion )
+              reflectp_theta = sphere_s.width+theta_shift;
+            else if( (sphere_s.width-theta_shift) <= expansion )
+              reflectp_theta = (theta_shift-sphere_s.width);
+            else
+              reflectp_theta = theta_shift;
+          }
+          if(warped_inputs[i].second.at<uchar>(phi_index, theta_index) != 0) {
+            expanded_image.at<cv::Vec3b>(reflectp_phi, reflectp_theta) = warped_inputs[i].first.at<cv::Vec3b>(phi_index, theta_index);
+            expanded_mask.at<uchar>(reflectp_phi, reflectp_theta) = warped_inputs[i].second.at<uchar>(phi_index, theta_index);
+          }
+        }
+
+        // Check the mask to make sure that this is part of the warped image and assign if so
+        if(warped_inputs[i].second.at<uchar>(phi_index, theta_index) != 0) {
+          expanded_image.at<cv::Vec3b>(phi_shift, theta_shift) = warped_inputs[i].first.at<cv::Vec3b>(phi_index, theta_index);
+          expanded_mask.at<uchar>(phi_shift, theta_shift) = warped_inputs[i].second.at<uchar>(phi_index, theta_index);
+        }
+      }
+    }
+
+    if(i < s_transforms.size()) {
+      t.phi_ += s_transforms[i].phi_;
+      t.theta_ += s_transforms[i].theta_;
+    }
+
+    WarpedPair wp_t;
+    wp_t.first = expanded_image;
+    wp_t.second = expanded_mask;
+    reflected.push_back( wp_t );
+    ROS_INFO("Expanded size: (%d, %d)", reflected.back().first.rows, reflected.back().first.cols);
   }
-}*/
+}
 
 void Panoramic::blend_sphere(std::vector<WarpedPair>& warped_inputs, cv::Mat& sphere, std::vector<SphericalTransform>& s_transforms, int phi_res, int theta_res)
 {
@@ -176,7 +262,7 @@ cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, i
 
       // Map
       warp.at<cv::Vec3b>(phi, theta) = scaled_input.at<cv::Vec3b>(y, x);
-      mask.at<unsigned char>(phi, theta) = 255;
+      mask.at<uchar>(phi, theta) = 255;
     }
   } 
 
@@ -211,7 +297,7 @@ void Panoramic::hsphere_to_sphere(WarpedPair& hsphere, cv::Mat& sphere, Spherica
         theta_shift = sphere.cols - theta_shift;
 
       // Check the mask to make sure that this is part of the warped image and assign if so
-      if(hsphere.second.at<unsigned char>(phi_index, theta_index) != 0) {
+      if(hsphere.second.at<uchar>(phi_index, theta_index) != 0) {
         sphere.at<cv::Vec3b>(phi_shift, theta_shift) = hsphere.first.at<cv::Vec3b>(phi_index, theta_index);
       }
     }
