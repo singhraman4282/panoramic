@@ -20,9 +20,15 @@ namespace nurc {
   
 struct SphericalTransform {
   SphericalTransform(int phi=0, int theta=0) : 
-    phi_(0), 
-    theta_(0) 
+    phi_(phi), 
+    theta_(theta) 
   {};
+
+  std::string toString() {
+    std::stringstream ss;
+    ss << "[PHI: " << phi_ << ", THETA: " << theta_ << "]\n";
+    return ss.str();
+  };
 
   int phi_;
   int theta_;
