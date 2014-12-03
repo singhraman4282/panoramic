@@ -85,60 +85,49 @@ cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int
   return warp;
 }
 
-void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pair<cv::Mat, cv::Mat> >& warped_inputs, int phi_res, int theta_res)
+void Panoramic::generate_spherical_stitch(cv::Mat& sphere, WarpedPairs& warped_inputs, int phi_res, int theta_res)
 {
-  // Algorithm
-  // Select the first image to be the center
-  // Incrementally add elements to the spherial warping
-  //   Each time an element is added run an image alignment over it
-  
-  for(int i = 0; i < warped_inputs.size()-1; i++){
-    cv::Mat first_image = warped_inputs[i].first;
-    cv::Mat second_image = warped_inputs[i+1].first;
-    cv::Mat first_mask = warped_inputs[i].second;
-    cv::Mat second_mask = warped_inputs[i+1].second;
-    //-- Step 1: Detect the keypoints using SURF Detector
-    int minHessian = 400;
-    cv::SurfFeatureDetector detector( minHessian );
-    std::vector<cv::KeyPoint> keypoints_1, keypoints_2;
-    detector.detect( first_image, keypoints_1, first_mask);
-    detector.detect( second_image, keypoints_2, second_mask);
+  // Perform a pairwise matching between images or incremental build-up
+  for(int i = 0; i < warped_inputs.size()-1; i++) {
+    // Define references to images
+    cv::Mat query_image = warped_inputs[i].first;
+    cv::Mat train_image = warped_inputs[i+1].first;
+    cv::Mat query_mask = warped_inputs[i].second;
+    cv::Mat train_mask = warped_inputs[i+1].second;
 
-    //-- Step 2: Calculate descriptors (feature vectors)
-    cv::SurfDescriptorExtractor extractor;
-    cv::Mat descriptors_1, descriptors_2;
-    extractor.compute( first_image, keypoints_1, descriptors_1 );
-    extractor.compute( second_image, keypoints_2, descriptors_2 );
+    cv::SiftFeatureDetector sift_detector;
+    KeyPoints query_kp, train_kp;
+    sift_detector.detect( query_image, query_kp, query_mask);
+    sift_detector.detect( second_image, trian_kp, train_mask);
 
-    //-- Step 3: Matching descriptor vectors using FLANN matcher
-    cv::FlannBasedMatcher matcher;
-    std::vector< cv::DMatch > matches;
-    matcher.match( descriptors_1, descriptors_2, matches );
+    cv::SiftDescriptorExtractor sift_features;
+    cv::Mat query_features, train_features;
+    sift_features.compute( query_im, query_im, query_features );
+    sift_features.compute( train_im, train_kp, train_features );
 
-    //-- Quick calculation of max and min distances between keypoints
-    double max_dist = 0; double min_dist = 100;
+    cv::FlannBasedMatcher feature_matcher;
+    std::vector<cv::DMatch> similar_features;
+    matcher.match( query_features, train_features, similar_features );
+
+    double max_dist = 0, min_dist = 100;
+    for( int i = 0; i < query_features.rows; i++ ) { 
+      if( similar_features[i].distance < min_dist ) min_dist = similar_features[i].distance;
+      if( similar_features[i].distance > max_dist ) max_dist = similar_features[i].distance;
+    }
+
+    std::vector<cv::DMatch> shared_features;
     for( int i = 0; i < descriptors_1.rows; i++ ){ 
-      double dist = matches[i].distance;
-      if( dist < min_dist ) min_dist = dist;
-      if( dist > max_dist ) max_dist = dist;
+      if( similar_features[i].distance <= std::max(2*min_dist, 0.02) )
+        shared_features.push_back( similar_features[i]); 
     }
-//    printf("-- Max dist : %f \n", max_dist );
-//    printf("-- Min dist : %f \n", min_dist );
 
-    //-- Draw only "good" matches
-    std::vector< cv::DMatch > good_matches;
-    for( int i = 0; i < descriptors_1.rows; i++ ){ 
-      if( matches[i].distance <= std::max(2*min_dist, 0.02) )
-        good_matches.push_back( matches[i]); 
-    }
-    cv::Mat img_matches;
-    drawMatches( first_image, keypoints_1, second_image, keypoints_2, good_matches, img_matches, Scalar::all(-1), Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    /* Displaying image and outputting some data
 
-    //-- Show detected matches
-    imshow( "Good Matches", img_matches );
- /*   for( int i = 0; i < (int)good_matches.size(); i++ ) {
-      printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx );
-    }
+    &cv::Mat feature_im;
+    drawMatches( query_im, query_kp, train_im, train_kp, shared_features, i
+                 feature_im, Scalar::all(-1), Scalar::all(-1), std::vector<char>(), 
+                 DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+    imshow( "Matched Features", img_matches );
 
     for( int i = 0; i < (int)good_matches.size(); i++ ) { 
       printf( "-- Good Match Points [%d] 1 X-value: %d  1 Y-value: %d -- 2 X-value: %d 2 Y-value: %d \n", i, 
@@ -157,14 +146,14 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pai
     int intlier_count = 0;
     int best_good_match = 0;
     for (int i = 0; i < max_iterations; i++) {
-      int temp_x_transform = keypoints_1[good_matches[i].queryIdx].pt.x - keypoints_2[good_matches[i].trainIdx].pt.x
-      int temp_y_transform = keypoints_1[good_matches[i].queryIdx].pt.y - keypoints_2[good_matches[i].trainIdx].pt.y
+      int temp_x_transform = query_kp[ shared_features[i].queryIdx ].pt.x - train_kp[ shared_features[i].trainIdx ].pt.x
+      int temp_y_transform = query_kp[ shared_features[i].queryIdx ].pt.y - train_kp[ shared_features[i].trainIdx ].pt.y
       int temp_count = 0;
       for (int j = 0; j < max_iterations; j++) {
 	if (j == i)
 	  continue
-	int x_transform_diff = keypoints_1[good_matches[i].queryIdx].pt.x - temp_x_transform - keypoints_2[good_matches[i].trainIdx].pt.x;
-	int y_transform_diff = keypoints_1[good_matches[i].queryIdx].pt.y - temp_y_transform - keypoints_2[good_matches[i].trainIdx].pt.y;
+	int x_transform_diff = query_kp[ shared_features[i].queryIdx ].pt.x - temp_x_transform - train_kp[ shared_features[i].trainIdx ].pt.x;
+	int y_transform_diff = query_kp[ shared_features[i].queryIdx ].pt.y - temp_y_transform - train_kp[ shared_features[i].trainIdx ].pt.y;
 	if (x_transform_diff < 5 && y_transform_diff < 5)
 	  temp_count = temp_count + 1;
       }
@@ -176,14 +165,4 @@ void Panoramic::generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pai
       }
     }
   }
-
-  cv::SiftFeatureDetector sift_detector;
-  cv::SiftDescriptorExtractor sift_extractor;
-  std::vector<KeyPoints> sift_features( warped_inputs.size() );
-  std::vector<cv::Mat> descriptors( warped_inputs.size() );
-  for(int i = 0; i < warped_inputs.size(); i++) sift_detector.detect( warped_inputs[i].first, sift_features[i] );
-  for(int i = 0; i < warped_inputs.size(); i++) sift_extractor.compute( warped_inputs[i].first, sift_features[i], descriptors[i] );
-
-  // Perform a pairwise matching between images or incremental build-up
-  
 }

@@ -23,6 +23,8 @@ public:
   typedef panoramic::SphericalStitch::Request SphericalStitchRequest;
   typedef panoramic::SphericalStitch::Response SphericalStitchResponse;
   typedef std::vector<cv::KeyPoint> KeyPoints;
+  typedef std::pair<cv::Mat, cv::Mat> WarpedPair;
+  typedef std::vector<WarpedPair> WarpedPairs;
 
   Panoramic();
   ~Panoramic();
@@ -32,7 +34,7 @@ public:
 
   bool stitch(SphericalStitchRequest& req, SphericalStitchResponse& res);
   cv::Mat map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask);
-  void generate_spherical_stitch(cv::Mat& sphere, std::vector< std::pair<cv::Mat, cv::Mat> >& warped_inputs, int phi_res, int theta_res);
+  void generate_spherical_stitch(cv::Mat& sphere, WarpedPairs& warped_inputs, int phi_res, int theta_res);
 
 private:
   // Camera Calibration
