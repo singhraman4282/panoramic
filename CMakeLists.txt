@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   message_generation
   cv_bridge
+  roslib
 )
 find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
@@ -137,6 +138,14 @@ target_link_libraries(camera_video_publisher
     panoramiclib
 )
 
+# TEST SUITE
+add_executable(ransac_test src/tests/ransac_test.cpp)
+target_link_libraries(ransac_test
+   ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    panoramiclib
+)
+
 add_executable(spherical_warping src/tests/spherical_warping.cpp)
 target_link_libraries(spherical_warping
     ${catkin_LIBRARIES}
@@ -194,6 +203,10 @@ target_link_libraries(match_sphere
 
 # all install targets should use catkin DESTINATION variables
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
+
+install(DIRECTORY res
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
