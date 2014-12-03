@@ -101,26 +101,46 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
   return true;
 }
 
+/*void Panoramic::generated_reflected_images(std::vector<WarpedPair>& warped_inputs, std::vector<WarpedPair>& reflected, int expansion)
+{
+  for(int i = 0; i < warped_inputs.size(); i++) {
+    cv::Mat expanded_image, expanded_mask;
+  }
+}*/
+
 void Panoramic::blend_sphere(std::vector<WarpedPair>& warped_inputs, cv::Mat& sphere, std::vector<SphericalTransform>& s_transforms, int phi_res, int theta_res)
 {
-  // Laplacian Pyramid
-  // Downsample, blend, then upsample
-  Pyramid p;
-  p.push_back(warped_inputs);
-  for(int i = 0; i < 3; i++) {
-    std::vector<WarpedPair> level;
-    for(int j = 0; j < p[i].size(); j++) {
-      cv::Mat p_im, p_mask;
-      pyrDown( p[i][j].first, p_im );
-      pyrDown( p[i][j].second, p_mask );
-      level.push_back( WarpedPair( p_im,  p_mask) );
-    }
-    p.push_back( level );
-  }
-  std::cout << "Building pyramid: " << p.size() << std::endl; 
-  // Blend with respect to masks at each level
+  // OpenCV Image Blending
+  // Maximum size at the boundaries is given by max image size
+  cv::Mat expanded_sphere( 3 * phi_res, 4 * theta_res, CV_8UC3 );
+  cv::detail::MultiBandBlender mbb(false, 100);
+  int esc_phi = expanded_sphere.rows/2;
+  int esc_theta = expanded_sphere.cols/2;
+  SphericalTransform t(0,0);
+  mbb.prepare( cv::Rect( 0, 0, expanded_sphere.rows-1, expanded_sphere.cols-1 ) );
+  for(int i = 0; i < warped_inputs.size(); i++) {
+    // Using the spherical transforms compute all of the corners in order
+    int wic_phi = warped_inputs[i].first.rows/2;
+    int wic_theta = warped_inputs[i].first.cols/2;
+    int tl_y, tl_x;
+    tl_y = t.phi_-wic_phi+esc_phi;
+    tl_x = t.theta_-wic_theta+esc_theta;
+    ROS_INFO("%d %d", tl_y, tl_x);
+    mbb.feed( warped_inputs[i].first, warped_inputs[i].second, cv::Point(tl_x, tl_y) );
 
-  // Reconstruct
+    if(i < s_transforms.size()) {
+      t.phi_ += s_transforms[i].phi_;
+      t.theta_ += s_transforms[i].theta_;
+    }
+  }
+  cv::Mat o = cv::Mat::ones( expanded_sphere.rows, expanded_sphere.cols, CV_8UC1 );
+  mbb.blend( expanded_sphere, o );
+
+  std::string p_path = ros::package::getPath("panoramic");
+  std::stringstream ss;
+  ss << p_path << "/res/images/expanded_sphere.jpg";
+  cv::imwrite(ss.str().c_str(), expanded_sphere);
+
 }
 
 cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask)
