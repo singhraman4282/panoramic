@@ -21,7 +21,6 @@ int main(int argc, char** argv)
   std::string resp;
   std::vector<sensor_msgs::Image> images;
   while(!finished) {
-    std::cout << "Path to image " << images.size() << ": ";
     ss.clear();
     ss.str( std::string() );
     std::string im_path;
