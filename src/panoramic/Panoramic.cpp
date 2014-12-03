@@ -46,42 +46,41 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
 
 cv::Mat Panoramic::map_to_sphere(cv::Mat& input, int phi_res, int theta_res, int focal_length, cv::Mat& mask)
 {
-  // Half-warping
+  // Warp planar image to half-sphere with resolution given by inputs
 
+  // Manage the case in which planar image is too large 
+  // for the sphere and the given resolution resulting in gaps
   double d_theta = atan(1.) / double(focal_length);
   double d_phi = atan(1. / double(focal_length) );
   double R_theta = d_theta * theta_res / M_PI;
   double R_phi = d_phi * phi_res / M_PI;
   int R = ceil(std::max( R_theta, R_phi ));
   
+  // Scaling of the input image will correct issues with uncompatible sizes
   cv::Mat scaled_input;
   cv::resize( input, scaled_input, cv::Size( ceil(R)*input.rows, ceil(R)*input.cols ) );
-
-  /*std::cout << d_theta << std::endl;
-  std::cout << d_phi << std::endl;
-  std::cout << R_theta << std::endl;
-  std::cout << R_phi << std::endl;
-  std::cout << R << std::endl;
-  std::cout << ceil(R) << std::endl;*/
   
+  // Warped image will be indexed using phi and theta coordinates
   cv::Mat warp( phi_res, theta_res, CV_8UC3 );
   mask = cv::Mat::zeros( phi_res, theta_res, CV_8UC1 );
   for(int y = 0; y < scaled_input.rows; y++) {
     for(int x = 0; x < scaled_input.cols; x++) {
+      // Compute transforms
       double y_disp = double(y-scaled_input.rows/2)/double(R);
       double x_disp = double(x-scaled_input.cols/2)/double(R);
-      int phi = ( atan( y_disp / pow( pow( x_disp, 2 ) + pow( double(focal_length), 2 ) , 0.5 ) )
-          + M_PI/2. ) * double( phi_res ) / M_PI;
+      int phi = ( atan( y_disp / pow( pow( x_disp, 2 ) + pow( double(focal_length), 2 ) , 0.5 ) ) + M_PI/2. ) * double( phi_res ) / M_PI;
       int theta = atan( x_disp / double(focal_length) ) * double( theta_res ) / M_PI;
       if(theta >= theta_res/2)
         theta = theta-theta_res/2;
       else
         theta = theta+theta_res/2;
+
+      // Map
       warp.at<cv::Vec3b>(phi, theta) = scaled_input.at<cv::Vec3b>(y, x);
       mask.at<unsigned char>(phi, theta) = 1;
     }
   } 
-
+  
   return warp;
 }
 
