@@ -34,7 +34,7 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     theta_res = (int)round(double( 2. * M_PI ) / atan( 1. / s ) );
   else theta_res = req.theta_res;
   if(req.s == SphericalStitchRequest::FOCAL_LENGTH)
-    s = 500;
+    s = 520;
   else s = req.s;
 
   cv::Mat sphere( phi_res, 2*theta_res, CV_8UC3 );
@@ -320,14 +320,14 @@ void Panoramic::generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPai
     min_dist = std::min_element( similar_features.begin(), similar_features.end(), nurc::DMatchDistanceCompare )->distance;
     std::vector<cv::DMatch> shared_features;
     for(int f = 0; f< query_features.rows; f++) { 
-      if( similar_features[f].distance <= std::max( 50*min_dist, 0.02 ) )
+      if( similar_features[f].distance <= std::max( 20*min_dist, 0.02 ) )
         shared_features.push_back( similar_features[f] ); 
     }
 
     //RANSAC
     // Define the maximum allowed deviation in terms of the Phi and Theta angles in radians
     ROS_INFO("Beginning RANSAC");
-    double max_phi_dev = 1.*(M_PI/180.), max_theta_dev = 1.*(M_PI/180.);
+    double max_phi_dev = 5.*(M_PI/180.), max_theta_dev = 5.*(M_PI/180.);
     double error_threshold = pow( double(max_phi_dev*max_phi_dev + max_theta_dev*max_theta_dev), 0.5 );
 
     int max_trials = shared_features.size();  // Reduce if this turns out to be too large
