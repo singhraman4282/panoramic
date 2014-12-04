@@ -131,6 +131,14 @@ target_link_libraries(camera_video_publisher
     panoramiclib
 )
 
+# Examples
+add_executable(stitch_images src/examples/stitch_images.cpp)
+target_link_libraries(stitch_images
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBRARIES}
+    panoramiclib
+)
+
 # TEST SUITE
 add_executable(ransac_test src/tests/ransac_test.cpp)
 target_link_libraries(ransac_test

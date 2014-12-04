@@ -4,6 +4,7 @@ int32 MAX_RES=0
 uint32 s
 uint32 theta_res
 uint32 phi_res
+sensor_msgs/CameraInfo camera_info
 sensor_msgs/Image[] queue
 ---
 sensor_msgs/Image stitch
