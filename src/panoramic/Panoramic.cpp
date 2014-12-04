@@ -320,7 +320,7 @@ void Panoramic::generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPai
     min_dist = std::min_element( similar_features.begin(), similar_features.end(), nurc::DMatchDistanceCompare )->distance;
     std::vector<cv::DMatch> shared_features;
     for(int f = 0; f< query_features.rows; f++) { 
-      if( similar_features[f].distance <= std::max( 20*min_dist, 0.02 ) )
+      if( similar_features[f].distance <= std::max( 50*min_dist, 0.02 ) )
         shared_features.push_back( similar_features[f] ); 
     }
 

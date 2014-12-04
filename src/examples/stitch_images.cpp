@@ -21,11 +21,7 @@ int main(int argc, char** argv)
   std::string resp;
   std::vector<sensor_msgs::Image> images;
   while(!finished) {
-<<<<<<< HEAD
     std::cout << "Please input the path to image " << images.size() << ": ";
-=======
-    std::cout << "Path to image " << images.size() << ": ";
->>>>>>> 4aae29319cbf0f74148d495cebcab46c4b5e05f5
     ss.clear();
     ss.str( std::string() );
     std::string im_path;
@@ -38,12 +34,7 @@ int main(int argc, char** argv)
       sensor_msgs::Image img_msg;
       cvi.toImageMsg( img_msg );
       images.push_back( img_msg );
-<<<<<<< HEAD
-      
-      
-=======
 
->>>>>>> 4aae29319cbf0f74148d495cebcab46c4b5e05f5
       std::cout << "Continue (y/n)? ";
       std::cin >> resp;
       if(resp != "y") finished = true;
