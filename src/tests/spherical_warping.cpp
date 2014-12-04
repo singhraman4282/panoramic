@@ -12,11 +12,13 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
 
   double focal_length;
-  std::string input_path, output_path;
+  std::string input_path, output_path, mask_path;
   std::cout << "Please input the path to the image: ";
   std::cin >> input_path;
   std::cout << "Please input the combined path and filename of the warped image: ";
   std::cin >> output_path;
+  std::cout << "Please input the combined path and filename of the mask image: ";
+  std::cin >> mask_path;
   std::cout << "Please input the desired focal length: ";
   std::cin >> focal_length;
   std::cout << std::endl;
@@ -30,8 +32,10 @@ int main(int argc, char** argv)
   
   cv::imshow(input_path.c_str(), sample);
   cv::imshow("Warped", warped);
+  cv::imshow("Mask", mask);
 
   cv::imwrite(output_path.c_str(), warped);
+  cv::imwrite(mask_path.c_str(), mask);
   std::cout << "Press any key to exit.";
   
   cv::waitKey(0);
