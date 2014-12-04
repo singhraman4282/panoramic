@@ -9,16 +9,16 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "sift_features");
   ros::NodeHandle nh;
 
-  cv::Mat sample = cv::imread("/home/tgdiriba/Code/ros_ws/src/panoramic/res/images/fuji.jpg");
+  cv::Mat sample = cv::imread("/home/parallels/Pictures/Tech_tester.jpg");
 
-  cv::SiftFeatureDetector sfd;
+  cv::SurfFeatureDetector sfd(300);
 
   cv::Mat descriptor;
 
   std::vector<cv::KeyPoint> kp;
   sfd.detect(sample, kp);
   
-  cv::SiftDescriptorExtractor sde;
+  cv::SurfDescriptorExtractor sde;
   sde.compute( sample, kp, descriptor );
   
   cv::drawKeypoints(sample, kp, sample);
