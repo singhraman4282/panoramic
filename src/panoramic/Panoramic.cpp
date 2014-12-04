@@ -84,6 +84,8 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     if(i < s_transforms.size()) {
       t.phi_ += s_transforms[i].phi_;
       t.theta_ += s_transforms[i].theta_;
+      t.phi_ = t.phi_ % phi_res;
+      t.theta_ = t.theta_ % theta_res;
     }
   }
 
@@ -302,10 +304,10 @@ void Panoramic::generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPai
     cv::Mat& query_mask = warped_inputs[i].second;
     cv::Mat& train_mask = warped_inputs[i+1].second;
 
-    cv::SiftFeatureDetector sift_detector;
+    cv::SurfFeatureDetector surf_detector(300);
     KeyPoints query_kp, train_kp;
-    sift_detector.detect( query_im, query_kp, query_mask);
-    sift_detector.detect( train_im, train_kp, train_mask);
+    surf_detector.detect( query_im, query_kp, query_mask);
+    surf_detector.detect( train_im, train_kp, train_mask);
 
     cv::SiftDescriptorExtractor sift_features;
     cv::Mat query_features, train_features;
@@ -320,7 +322,7 @@ void Panoramic::generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPai
     min_dist = std::min_element( similar_features.begin(), similar_features.end(), nurc::DMatchDistanceCompare )->distance;
     std::vector<cv::DMatch> shared_features;
     for(int f = 0; f< query_features.rows; f++) { 
-      if( similar_features[f].distance <= std::max( 20*min_dist, 0.02 ) )
+      if( similar_features[f].distance <= std::max( 100*min_dist, 10. ) )
         shared_features.push_back( similar_features[f] ); 
     }
 
