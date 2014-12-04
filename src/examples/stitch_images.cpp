@@ -68,7 +68,7 @@ int main(int argc, char** argv)
   ci.D[4] = 0.0;
   stitch_srv.request.camera_info = ci;
 
-  stitch_srv.request.s = panoramic::SphericalStitchRequest::FOCAL_LENGTH;
+  stitch_srv.request.s = 1050;
   stitch_srv.request.phi_res = stitch_srv.request.theta_res = 1000;
   stitch_srv.request.queue = images;
 
