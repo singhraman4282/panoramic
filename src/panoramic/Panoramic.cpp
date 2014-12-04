@@ -327,7 +327,7 @@ void Panoramic::generate_image_transforms(cv::Mat& sphere, std::vector<WarpedPai
     //RANSAC
     // Define the maximum allowed deviation in terms of the Phi and Theta angles in radians
     ROS_INFO("Beginning RANSAC");
-    double max_phi_dev = 5.*(M_PI/180.), max_theta_dev = 5.*(M_PI/180.);
+    double max_phi_dev = 2.5*(M_PI/180.), max_theta_dev = 2.5*(M_PI/180.);
     double error_threshold = pow( double(max_phi_dev*max_phi_dev + max_theta_dev*max_theta_dev), 0.5 );
 
     int max_trials = shared_features.size();  // Reduce if this turns out to be too large
