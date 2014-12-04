@@ -24,6 +24,8 @@ int main(int argc, char** argv)
   std::cout << "Reading image.\n";
   cv::Mat sample = cv::imread(input_path.c_str());
   cv::Mat mask(1000,1000,CV_8UC1);
+
+  nurc::Panoramic p_server;
   cv::Mat warped = p_server.warp_to_hsphere(sample, 1000, 1000, focal_length, mask);
   
   cv::imshow(input_path.c_str(), sample);
