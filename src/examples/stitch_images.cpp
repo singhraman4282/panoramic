@@ -21,6 +21,7 @@ int main(int argc, char** argv)
   std::string resp;
   std::vector<sensor_msgs::Image> images;
   while(!finished) {
+    std::cout << "Please input the path to image " << images.size() << ": ";
     ss.clear();
     ss.str( std::string() );
     std::string im_path;
@@ -33,9 +34,7 @@ int main(int argc, char** argv)
       sensor_msgs::Image img_msg;
       cvi.toImageMsg( img_msg );
       images.push_back( img_msg );
-
-      std::cout << "Coverted image successfully.\n";
-      std::cout << im.rows << " " << im.cols << std::endl;
+      
       
       std::cout << "Continue (y/n)? ";
       std::cin >> resp;
