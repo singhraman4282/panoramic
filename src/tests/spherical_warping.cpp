@@ -10,28 +10,14 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "spherical_warping");
   ros::NodeHandle nh;
-
-  double focal_length;
-  std::string input_path, output_path;
-  std::cout << "Please input the path to the image: ";
-  std::cin >> input_path;
-  std::cout << "Please input the path to where to save the warped image: ";
-  std::cin >> output_path;
-  std::cout << "Please input the desired focal length: ";
-  std::cin >> focal_length;
-  std::cout << std::endl;
   
-  std::cout << "Reading image.\n";
-  cv::Mat sample = cv::imread(input_path.c_str());
-  
+  cv::Mat sample = cv::imread("/home/parallels/Pictures/Tech_tester.jpg");
   nurc::Panoramic p_server;
   cv::Mat mask;
-  cv::Mat warped = p_server.warp_to_hsphere(sample, 1000, 1000, focal_length, mask);
-  
-  cv::imshow(input_path.c_str(), sample);
+  cv::Mat warped = p_server.warp_to_hsphere(sample, 1000, 1000, 1050, mask);
   cv::imshow("Warped", warped);
 
-  cv::imwrite(output_path.c_str(), warped);
+  cv::imwrite("/home/parallels/Pictures/Tech_tester_warped.jpg", warped);
   
   cv::waitKey(0);
   
