@@ -18,8 +18,10 @@ int main( int argc, char** argv )
   if( argc != 3 )
   { readme(); return -1; }
 
-  Mat img_1 = imread( argv[1], CV_LOAD_IMAGE_GRAYSCALE );
-  Mat img_2 = imread( argv[2], CV_LOAD_IMAGE_GRAYSCALE );
+  Mat img_1 = imread( argv[1]);
+  Mat mask_1 = imread( argv[2], CV_LOAD_IMAGE_GRAYSCALE );
+  Mat img_2 = imread( argv[3]);
+  Mat mask_2 = imread( argv[4], CV_LOAD_IMAGE_GRAYSCALE );
 
   if( !img_1.data || !img_2.data )
   { std::cout<< " --(!) Error reading images " << std::endl; return -1; }
@@ -31,8 +33,8 @@ int main( int argc, char** argv )
 
   std::vector<KeyPoint> keypoints_1, keypoints_2;
 
-  detector.detect( img_1, keypoints_1 );
-  detector.detect( img_2, keypoints_2 );
+  detector.detect( img_1, keypoints_1, mask_1 );
+  detector.detect( img_2, keypoints_2, mask_2 );
 
   //-- Step 2: Calculate descriptors (feature vectors)
   SurfDescriptorExtractor extractor;
