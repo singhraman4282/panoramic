@@ -87,9 +87,6 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     }
   }
 
-  std::string p_path = ros::package::getPath("panoramic");
-  std::stringstream ss;
-
   /*std::vector<WarpedPair> reflected;
   generate_reflected_images(image_queue, reflected, s_transforms, phi_res, theta_res);
   for(int i = 0; i < reflected.size(); i++) {
@@ -104,16 +101,6 @@ bool Panoramic::stitch(SphericalStitchRequest& req, SphericalStitchResponse& res
     cv::imwrite(ss.str().c_str(), reflected[i].second);
   }
   blend_sphere(reflected, sphere, s_transforms, phi_res, theta_res);*/
-
-  ss.clear();
-  ss.str( std::string() );
-  ss << p_path << "/res/images/mask.jpg";
-  cv::imwrite(ss.str().c_str(), image_queue[0].second);
-  
-  ss.clear();
-  ss.str( std::string() );
-  ss << p_path << "/res/images/sphere.jpg";
-  cv::imwrite(ss.str().c_str(), sphere);
 
   std_msgs::Header im_header;
   im_header.stamp = ros::Time::now();
@@ -222,11 +209,6 @@ void Panoramic::blend_sphere(std::vector<WarpedPair>& reflected_inputs, cv::Mat&
       sphere.at<cv::Vec3b>(phi_index, theta_index) = expanded_sphere.at<cv::Vec3b>(phi_index+expansion, theta_index+expansion);
     }
   }
-  
-  std::string p_path = ros::package::getPath("panoramic");
-  std::stringstream ss;
-  ss << p_path << "/res/images/expanded_sphere.jpg";
-  cv::imwrite(ss.str().c_str(), expanded_sphere);
 
 }
 
@@ -266,13 +248,6 @@ cv::Mat Panoramic::warp_to_hsphere(cv::Mat& input, int phi_res, int theta_res, i
       mask.at<uchar>(phi, theta) = 255;
     }
   } 
-
-  static int sn = 0;
-  sn++;
-  std::string p_path = ros::package::getPath("panoramic");
-  std::stringstream ss;
-  ss << p_path << "/res/images/stitched_" << sn << ".jpg";
-  cv::imwrite(ss.str().c_str(), warp);
   
   return warp;
 }
